@@ -1,0 +1,12 @@
+entero = 25
+flotante = 9.99
+cadena = 
+
+
+"Hola mundo"
+
+// Esto es un comentario
+
+para(i=0;i<5;i++){
+
+}
