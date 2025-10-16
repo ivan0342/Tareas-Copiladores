@@ -1,3 +1,4 @@
+import re
 from lexico import Lexico
 
 class Analizador:
@@ -6,30 +7,34 @@ class Analizador:
         self.tokens_validos = []
         self.errores_lexicos = []
     
+
     def analizador(self, texto):
         self.tokens_validos.clear()
         self.errores_lexicos.clear()
-        
-        lineas = texto.splitlines()
-        for i, linea in enumerate(lineas, start =1):
-            elementos = self.lexico.categorizaElementos(linea);
-            
-            for elemento in elementos:
-                token = self.lexico.identificaToken(elemento)
-                if token == "token no valido":
-                    
-                    columna = linea.find(elemento) +1
-                    self.errores_lexicos.append({
-                        "token": elemento,
-                        "linea": i,
-                        "columna": columna
-                    })
+
+        token_pattern = re.compile(r'''
+            "(?:[^"\\]|\\.)*"         | # cadenas entre comillas
+            //[^\n]*                  | # comentarios de una línea
+            \d+\.\d+                  | # números flotantes
+            \d+                       | # números enteros
+            [a-zA-Z_][a-zA-Z0-9_]*    | # identificadores
+            [=+\-*/<>]                | # operadores
+            [(){},;]                   # símbolos especiales   
+        ''', re.VERBOSE)
+
+        for num_linea, linea in enumerate(texto.splitlines(), start=1):
+            for match in token_pattern.finditer(linea):
+                token = match.group()
+                columna = match.start() + 1
+                tipo = self.lexico.identificaToken(token)
+                if tipo == "token no valido":
+                    self.errores_lexicos.append({"token": token, "linea": num_linea, "columna": columna})
                 else:
-                      self.tokens_validos.append({
-                        "token": elemento,
-                        "tipo": token
-                    })
+                    self.tokens_validos.append({"token": token, "tipo": tipo})
+
         return self.tokens_validos, self.errores_lexicos
+    
+    
                 
         
         

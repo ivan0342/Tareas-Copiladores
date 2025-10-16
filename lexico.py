@@ -6,6 +6,10 @@ class Lexico:
     patron_entero = re.compile(r"^[0-9]+$")
     patron_flotante = re.compile(r"^[0-9]+\.[0-9]+$")
     patron_cadena = re.compile(r'^".*"$')
+    patron_aritmetico = re.compile(r'^(\+|-|\*|/|%|\+\+|--)$')
+    patron_relacional = re.compile(r'^(==|!=|<=|>=|<|>)$')
+    patron_logico = re.compile(r'^(&&|\|\||!)$')
+
 
 
     palabras_reservadas = ["entero", "flotante", "booleano", "caracter", "cadena", "arreglo",
@@ -33,8 +37,18 @@ class Lexico:
             return "Flotante"
         elif re.match(self.patron_cadena, token):
             return "Cadena"
+        elif re.match(self.patron_aritmetico, token):
+            return "Signo aritmetico"
+        elif re.match(self.patron_relacional, token):
+            return "Signo relacional"
+        elif re.match(self.patron_logico, token):
+            return "Identificador logico"
         elif token == "=":
             return "Operador de asignacion"
+        elif token == "{":
+            return "token inicio de bloque"
+        elif token == "}":
+            return "token fin de bloque"
         elif token in ["(", ")", ",", ";"]:
             return "Simbolo especial"
         elif token.startswith("//"):

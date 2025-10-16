@@ -16,9 +16,7 @@ class Interfaz:
     def creacion_interfaz(self):
         editor = ttk.Frame(self.ventana);
         editor.pack(pady=10, padx=10)
-        
-        #self.area_texto = tk.Text(editor, wrap=tk.WORD, font=("Consolas", 12))
-        
+                
         self.text_area = tk.Text(editor, wrap=tk.WORD, font=("Consolas", 12))
         self.text_area.pack(fill=tk.BOTH, expand=True)
 
