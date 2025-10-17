@@ -2,7 +2,7 @@
 import re
 
 class Lexico:
-    patron_identificador = re.compile(r"^[a-zA-Z]+$")
+    patron_identificador = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]*$")
     patron_entero = re.compile(r"^[0-9]+$")
     patron_flotante = re.compile(r"^[0-9]+\.[0-9]+$")
     patron_cadena = re.compile(r'^".*"$')
@@ -14,8 +14,9 @@ class Lexico:
 
     palabras_reservadas = ["entero", "flotante", "booleano", "caracter", "cadena", "arreglo",
                            "clase", "interfaz", "enumeracion", "si", "sino", "segun", "defecto",
-                           "mientras", "para", "hacer", "romper", "continuar", "retornar", "intentar",
-                           "capturar", "importar", "exportar", "hereda", "nuevo", "usar"]
+                           "caso", "mientras", "para", "hacer", "romper", "continuar", "retornar", "vacio",
+                           "intentar", "capturar", "importar", "exportar", "hereda", "nuevo", "usar",
+                           "constante", "imprimir"]
     
     def __init__(self):
         self.tokens_validos = []
@@ -27,7 +28,9 @@ class Lexico:
         return tokens
 
     def identificaToken(self, token):
-        if token in self.palabras_reservadas:
+        if re.fullmatch(r'\d+[a-zA-Z_][a-zA-Z0-9_]*', token):
+            return "Error léxico: identificador inválido '{token}'"
+        elif token in self.palabras_reservadas:
             return "Palabra reservada"
         elif re.match(self.patron_identificador, token):
             return "Identificador"

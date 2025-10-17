@@ -18,6 +18,7 @@ class Analizador:
             \d+\.\d+                  | # números flotantes
             \d+                       | # números enteros
             [a-zA-Z_][a-zA-Z0-9_]*    | # identificadores
+            \d+[a-zA-Z_][a-zA-Z0-9_]* | # identificadores mal formados (inválidos)
             [=+\-*/<>]                | # operadores
             [(){},;]                   # símbolos especiales   
         ''', re.VERBOSE)

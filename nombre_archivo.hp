@@ -1,12 +1,98 @@
-entero = 25
-flotante = 9.99
-cadena = 
+// 1. Módulos y paquetes
+importar utilidades;
+exportar principal;
 
+// 2. Uso de biblioteca estándar
+usar matematicas;
 
-"Hola mundo"
+// 3. Comentarios
+// Programa de ejemplo que demuestra toda la gramática
+/* Incluye tipos, variables, estructuras, funciones y clases */
 
-// Esto es un comentario
+// 4. Tipos de datos y declaraciones
+entero contador = 0;
+flotante promedio = 9.75;
+booleano activo = verdadero;
+caracter inicial = 'J';
+cadena mensaje = "Hola mundo";
+constante entero MAX_INTENTOS = 3;
 
-para(i=0;i<5;i++){
+// 5. Estructuras de control
+si (activo) {
+    mensaje = "El sistema está activo";
+} sino {
+    mensaje = "El sistema está inactivo";
+}
 
+segun (contador) {
+    caso 0:
+        mensaje = "Comenzando...";
+        romper;
+    caso 1:
+        mensaje = "Progreso medio";
+        romper;
+    defecto:
+        mensaje = "Finalizado";
+}
+
+// 6. Bucles
+para (entero i = 0; i < 5; i += 1) {
+    si (i == 2) {
+        continuar;
+    }
+    imprimir(i);
+}
+
+mientras (contador < 3) {
+    contador += 1;
+}
+
+hacer {
+    promedio += 0.1;
+} mientras (promedio < 10.0);
+
+// 7. Funciones y retorno
+flotante calcularPromedio(entero suma, entero total) {
+    si (total == 0) {
+        retornar 0.0;
+    }
+    retornar suma / total;
+}
+
+// 8. Manejo de errores
+intentar {
+    promedio = calcularPromedio(20, 2);
+} capturar (error) {
+    mensaje = "Error al calcular promedio";
+}
+
+// 9. Orientación a objetos
+clase Persona hereda SerVivo {
+    cadena nombre;
+    entero edad;
+
+    flotante obtenerEdadPromedio(entero suma, entero total) {
+        retornar suma / total;
+    }
+}
+
+interfaz Mostrable {
+    vacio mostrar();
+}
+
+clase Estudiante hereda Persona {
+    flotante calificacion;
+
+    vacio mostrar() {
+        imprimir("Nombre: " + nombre);
+        imprimir("Calificación: " + calificacion);
+    }
+}
+
+entero main() {
+    Persona p = nuevo Persona();
+    Estudiante e = nuevo Estudiante("Juan", 22, 9.8);
+
+    e.mostrar();
+    retornar 0;
 }
