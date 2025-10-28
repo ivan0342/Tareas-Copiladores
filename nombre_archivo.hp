@@ -96,3 +96,29 @@ entero main() {
     e.mostrar();
     retornar 0;
 }
+
+// 1. Módulos y paquetes
+importar utilidades;
+exportar principal;
+
+// 2. Uso de biblioteca estándar
+usar matematicas;
+
+// 3. Comentarios
+// Programa de ejemplo que demuestra toda la gramática
+/* Incluye tipos, variables, estructuras, funciones y clases */
+
+// 4. Tipos de datos y declaraciones
+entero contador = 0;
+flotante promedio = 9.75;
+booleano activo = verdadero;
+caracter inicial = 'J';
+cadena mensaje = "Hola mundo";
+constante entero MAX_INTENTOS = 3;
+
+// 5. Estructuras de control
+si (activo) {
+    mensaje = "El sistema está activo";
+} sino {
+    mensaje = "El sistema está inactivo";
+}
