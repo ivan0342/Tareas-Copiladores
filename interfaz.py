@@ -61,7 +61,7 @@ class Interfaz:
             messagebox.showinfo("Aviso", "No hay texto para analizar.")
             return
 
-        tokens, errores = self.analizador.analizar(texto)
+        tokens, errores = self.analizador.tokenize(texto)
 
         self.mostrar_resultados()
 
