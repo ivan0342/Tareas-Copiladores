@@ -11,6 +11,9 @@ class AnalizadorSintactico:
         self.tabla_simbolos = tabla_simbolos
 
     def analizar(self, tokens):
+        print("TOKENS RECIBIDOS POR EL PARSER:")
+        for t in tokens:
+         print(t)
         """
         tokens: lista de dicts [{'token':lexema,'tipo':tipo,'linea':L, 'columna':C}, ...]
         Devuelve: lista de errores sintácticos/semánticos (strings). Lista vacía si no hay.
@@ -24,7 +27,7 @@ class AnalizadorSintactico:
 
         # 1) Parseo -> AST
         try:
-            parser = Parser(tokens)
+            parser = Parser(tokens ,self.tabla_simbolos)
             ast = parser.parse()
         except ParserError as e:
             # Parser levanta en el primer error. Devolvemos mensaje útil.
@@ -78,41 +81,43 @@ class AnalizadorSintactico:
         if tipo_n == "DECL_VAR":
             ident = nodo.get("id")
             tipo_dato_token = nodo.get("tipo")  # como aparece en el token (ej. "entero")
-            # Buscar si ya existe
-            sim = None
+
+            # Buscar si ya existe el símbolo
             try:
                 sim = self.tabla_simbolos.buscar_simbolo(ident)
+                print("Símbolo encontrado:", sim)
             except Exception:
                 sim = None
 
-            if sim:
-                # Actualizamos tipo y estado
-                sim["tipo_dato"] = tipo_dato_token
-                sim["estado"] = "declarado"
-            else:
-                # Insertar nuevo símbolo
+            if sim is None:
+                # No existe -> creamos nuevo símbolo
                 simbolo = {
                     "identificador": ident,
-                    "categoria": "IDENTIFICADOR",
+                    "categoria": "variable",
                     "tipo_dato": tipo_dato_token,
                     "ambito": "Global",
                     "direccion": None,
                     "linea": nodo.get("linea", -1),
-                    "valor": None,
-                    "estado": "declarado",
+                    "valor": self._valor_literal_de_nodo(nodo.get("valor")),
+                    "estado": "declarado" if nodo.get("valor") is None else "inicializado",
                     "estructura": None,
-                    "contador_referencias": 0
+                    "contador_referencias": 1
                 }
-                self.tabla_simbolos.insertar_simbolo(simbolo)
+                self.tabla_simbolos.insertar(simbolo)
+                print(f"Símbolo nuevo insertado: {simbolo}")
+            else:
+                # Ya existe -> actualizamos tipo y/o valor
+                if isinstance(sim, dict):
+                    sim["tipo_dato"] = tipo_dato_token
+                    sim["estado"] = "declarado"
 
-            # Si hay un valor inicial (nodo "valor"), tratarlo (pero no evaluamos tipos aquí)
-            if nodo.get("valor") is not None:
-                # aumentamos contador de referencias y marcamos inicializado
-                sim2 = self.tabla_simbolos.buscar_simbolo(ident)
-                if sim2:
-                    sim2["valor"] = self._valor_literal_de_nodo(nodo["valor"])
-                    sim2["estado"] = "inicializado"
-                    sim2["contador_referencias"] = sim2.get("contador_referencias", 0) + 1
+                    if nodo.get("valor") is not None:
+                        sim["valor"] = self._valor_literal_de_nodo(nodo.get("valor"))
+                        sim["estado"] = "inicializado"
+                        sim["contador_referencias"] = sim.get("contador_referencias", 0) + 1
+                        print(f"Símbolo actualizado: {sim}")
+                else:
+                    print(f"Advertencia: símbolo {ident} no es un diccionario válido.")
 
             return
 
@@ -139,7 +144,7 @@ class AnalizadorSintactico:
                     "estructura": None,
                     "contador_referencias": 1
                 }
-                self.tabla_simbolos.insertar_simbolo(simbolo)
+                self.tabla_simbolos.insertar(simbolo)
             else:
                 sim["valor"] = self._valor_literal_de_nodo(nodo.get("valor"))
                 sim["estado"] = "inicializado"
