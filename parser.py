@@ -12,6 +12,18 @@ class Parser:
         self.tabla_simbolos = tabla_simbolos
         self.ast = []  # árbol sintáctico abstracto
 
+    def error(self, mensaje):
+        tok = self.actual()
+        self.errores.append(f"{mensaje} en línea {tok['linea']}")
+        raise ParserError(mensaje)
+
+    def match_multiple(self, *tipos):
+        token = self.actual()  # ← aquí estaba el error
+        if token and token["tipo"] in tipos:
+            self.i += 1  # avanzar
+            return token
+        return None
+
     def actual(self):
         if self.i < len(self.tokens):
             return self.tokens[self.i]
@@ -41,12 +53,16 @@ class Parser:
                 self.i += 1
         return self.ast
 
+
+
     # -------------------------------------------------------
     # DECISIONES PRINCIPALES
     # -------------------------------------------------------
     def declaracion_o_sentencia(self):
         tipo = self.actual()["tipo"]
-        if tipo in ("TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_BOOLEANO", "TIPO_CARACTER", "TIPO_CADENA"):
+        # Solo es declaración de variable si NO estamos dentro de una clase
+        if tipo in ("TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_BOOLEANO", "TIPO_CARACTER",
+                    "TIPO_CADENA") and not self.tabla_simbolos.en_clase():
             return self.declaracion_variable()
         elif tipo == "IDENTIFICADOR":
             return self.asignacion()
@@ -58,6 +74,10 @@ class Parser:
             return self.imprimir_sentencia()
         elif tipo == "LLAVE_IZQ":
             return self.bloque()
+        elif tipo == "CLASE":
+            return self.declaracion_clase()
+        elif tipo in ("TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_BOOLEANO", "TIPO_CARACTER", "TIPO_CADENA", "VACIO"):
+            return self.declaracion_funcion()
         else:
             self.errores.append(f"Token inesperado '{self.actual()['tipo']}' en línea {self.actual()['linea']}")
             self.i += 1
@@ -242,3 +262,152 @@ class Parser:
             self.match("PAREN_DER")
             return nodo
         raise ParserError(f"Factor inválido en línea {tok['linea']}: {tok['token']}")
+
+    # -------------------------------------------------------
+    # DEFINICION DE CLASES
+    # -------------------------------------------------------
+
+    def declaracion_clase(self):
+        self.match("CLASE")
+        nombre = self.match("IDENTIFICADOR")["token"]
+
+        base = None
+        if self.actual()["tipo"] == "HEREDA":
+            self.match("HEREDA")
+            base = self.match("IDENTIFICADOR")["token"]
+
+        self.match("LLAVE_IZQ")
+
+        # Entrar al ámbito de clase
+        self.tabla_simbolos.entrar_ambito(nombre)
+
+        atributos = []
+        metodos = []
+
+        while self.actual()["tipo"] != "LLAVE_DER":
+
+            # Detectar si es método (después del tipo y nombre viene '(')
+            if self.actual()["tipo"] in (
+            "TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_BOOLEANO", "TIPO_CARACTER", "TIPO_CADENA"):
+                # Mirar adelante 2 tokens (tipo IDENT '(' )
+                if (self.tokens[self.i + 1]["tipo"] == "IDENTIFICADOR"
+                        and self.tokens[self.i + 2]["tipo"] == "PAREN_IZQ"):
+                    metodos.append(self.metodo_de_clase())
+                else:
+                    atributos.append(self.declaracion_variable())
+            else:
+                self.error(f"Token inesperado dentro de la clase: {self.actual()['token']}")
+
+        self.match("LLAVE_DER")
+
+        # Salir del ámbito
+        self.tabla_simbolos.salir_ambito()
+
+        simbolo = {
+            "identificador": nombre,
+            "categoria": "clase",
+            "tipo_dato": "-",
+            "linea": -1,
+            "ambito": "Global",
+            "direccion": None,
+            "valor": f"Hereda: {base}" if base else "Clase base",
+            "estado": "definida",
+            "estructura": "Clase",
+            "contador_referencias": 0
+        }
+        self.tabla_simbolos.insertar(simbolo)
+
+        return {"nodo": "CLASE", "nombre": nombre, "base": base, "atributos": atributos, "metodos": metodos}
+
+    def metodo_de_clase(self):
+        # Tipo de retorno
+        tipo_token = self.match_multiple(
+            "TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_CADENA", "TIPO_BOOLEANO", "TIPO_CARACTER"
+        )
+        if tipo_token is None:
+            self.error("Se esperaba un tipo de dato en la declaración del método")
+        tipo = tipo_token["token"]
+
+        # Nombre del método
+        nombre = self.match("IDENTIFICADOR")["token"]
+
+        # Parámetros
+        self.match("PAREN_IZQ")
+        params = self.parametros()
+        self.match("PAREN_DER")
+
+        # Cuerpo del método
+        cuerpo = self.bloque()
+
+        return {
+            "nodo": "METODO",
+            "nombre": nombre,
+            "tipo": tipo,
+            "params": params,
+            "cuerpo": cuerpo
+        }
+
+    # -------------------------------------------------------
+    # FUNCIONES
+    # -------------------------------------------------------
+
+    def declaracion_funcion(self):
+        tipo = self.match(self.actual()["tipo"])["token"]  # tipo retorno
+        nombre = self.match("IDENTIFICADOR")["token"]
+
+        self.match("PAREN_IZQ")
+        parametros = []
+
+        if self.actual()["tipo"] != "PAREN_DER":
+            while True:
+                tipo_param = self.match(self.actual()["tipo"])["token"]
+                id_param = self.match("IDENTIFICADOR")["token"]
+                parametros.append((tipo_param, id_param))
+                if self.actual()["tipo"] != "COMA":
+                    break
+                self.match("COMA")
+
+        self.match("PAREN_DER")
+
+        # Entrar ámbito función
+        self.tabla_simbolos.entrar_ambito(nombre)
+
+        for tipo_param, id_param in parametros:
+            self.tabla_simbolos.insertar({
+                "identificador": id_param,
+                "categoria": "parámetro",
+                "tipo_dato": tipo_param,
+                "estado": "inicializado",
+                "ambito": self.tabla_simbolos.ambito_actual(),
+                "valor": None
+            })
+
+        bloque_func = self.bloque()
+
+        self.tabla_simbolos.salir_ambito()
+
+        simbolo = {
+            "identificador": nombre,
+            "categoria": "función",
+            "tipo_dato": tipo,
+            "valor": parametros,
+            "estado": "definida",
+            "ambito": "Global",
+            "estructura": "Función"
+        }
+        self.tabla_simbolos.insertar(simbolo)
+
+        return {"nodo": "FUNCION", "nombre": nombre, "params": parametros, "cuerpo": bloque_func}
+
+    def parametros(self):
+        params = []
+        if self.actual()["tipo"] in ("TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_BOOLEANO", "TIPO_CARACTER", "TIPO_CADENA"):
+            while True:
+                tipo = self.match(self.actual()["tipo"])["token"]
+                nombre = self.match("IDENTIFICADOR")["token"]
+                params.append((tipo, nombre))
+                if self.actual()["tipo"] != "COMA":
+                    break
+                self.match("COMA")
+        return params
+

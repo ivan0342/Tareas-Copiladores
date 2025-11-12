@@ -35,12 +35,12 @@ class AnalizadorSintactico:
             return errores
 
         # 2) Recorrer AST para poblar/update tabla de símbolos (declaraciones y asignaciones)
-        try:
-            self._actualizar_tabla_desde_ast(ast)
-        except Exception as e:
-            errores.append(f"Error al actualizar tabla de símbolos: {e}")
-            # No retornamos aún: podríamos intentar ejecutar, pero mejor reportar y parar.
-            return errores
+        #try:
+        #    self._actualizar_tabla_desde_ast(ast)
+        #except Exception as e:
+        #    errores.append(f"Error al actualizar tabla de símbolos: {e}")
+        #    # No retornamos aún: podríamos intentar ejecutar, pero mejor reportar y parar.
+        #    return errores
 
         # 3) Ejecutar AST con intérprete (capturamos salidas)
         salida_lines = []

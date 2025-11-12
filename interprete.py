@@ -5,10 +5,16 @@ from tabla_simbolos import tabla
 class RuntimeErrorInterp(Exception):
     pass
 
+class ReturnSignal(Exception):
+    def __init__(self, valor):
+        self.valor = valor
+
 class Interprete:
     def __init__(self, output=print):
         self.memoria = {}
         self.output = output
+        self.funciones = {}  # nombre → nodo función
+        self.clases = {}  # nombre → nodo clase
 
     def ejecutar_programa(self, ast):
         resultado = None
@@ -86,3 +92,75 @@ class Interprete:
             if name not in self.memoria:
                 raise RuntimeErrorInterp(f"Variable no declarada: {name}")
             return self.memoria[name]
+
+        if tipo == "NUEVO":
+            return self.crear_objeto(nodo["clase"], nodo["args"])
+
+        if tipo == "FUNCION":
+            nombre = nodo["nombre"]
+            self.funciones[nombre] = nodo
+            return None
+
+        if tipo == "RETORNAR":
+            valor = self.ejecutar(nodo["valor"])
+            raise ReturnSignal(valor)
+
+        if tipo == "CLASE":
+            nombre = nodo["nombre"]
+            self.clases[nombre] = nodo
+            return None
+
+        if tipo == "LLAMADA_METODO":
+            obj = self.memoria[nodo["obj"]]
+            clase = self.clases[obj["__clase__"]]
+            metodo = clase["metodos"][nodo["metodo"]]
+            args = [obj] + [self.ejecutar(a) for a in nodo["args"]]
+            return self.llamar_funcion(metodo["nombre"], args)
+
+
+    def llamar_funcion(self, nombre, args_nodos):
+        if nombre not in self.funciones:
+            raise RuntimeErrorInterp(f"Función no declarada: {nombre}")
+
+        funcion = self.funciones[nombre]
+
+        # Creamos un nuevo entorno local
+        entorno_anterior = self.memoria
+        self.memoria = self.memoria.copy()
+
+        # Pasar parámetros
+        parametros = funcion["params"]
+        args = [self.ejecutar(a) for a in args_nodos]
+
+        for (tipo, id_param), valor in zip(parametros, args):
+            self.memoria[id_param] = valor
+
+        try:
+            self.ejecutar(funcion["cuerpo"])
+        except ReturnSignal as r:
+            resultado = r.valor
+        else:
+            resultado = None
+
+        # Restaurar entorno
+        self.memoria = entorno_anterior
+        return resultado
+
+    def crear_objeto(self, nombre_clase, args):
+        if nombre_clase not in self.clases:
+            raise RuntimeErrorInterp(f"Clase '{nombre_clase}' no declarada")
+
+        clase = self.clases[nombre_clase]
+
+        # Crear instancia
+        obj = {"__clase__": nombre_clase}
+
+        # Inicializar atributos
+        for attr in clase["atributos"]:
+            obj[attr["id"]] = None
+
+        # Llamar constructor si existe
+        if nombre_clase in self.funciones:
+            self.llamar_funcion(nombre_clase, [obj] + [self.ejecutar(a) for a in args])
+
+        return obj

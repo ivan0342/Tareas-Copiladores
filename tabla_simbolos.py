@@ -10,6 +10,7 @@ class TablaSimbolos:
         self.overflow = []
         self.direccion_actual = 0
         self.contador_direccion = 0  # Para generar direcciones únicas tipo 0x0001
+        self.pila_ambitos = ["Global"]  # <--- pila de ámbitos
 
     # ------------------------------------------
     # MÉTODOS DE APOYO
@@ -34,6 +35,10 @@ class TablaSimbolos:
     def insertar(self, simbolo):
         """Inserta símbolo con dirección de memoria y maneja overflow"""
         tam = self._tamanio_simbolo(simbolo)
+
+        # Asignar ámbito automáticamente
+        simbolo["ambito"] = self.ambito_actual()
+
         simbolo["Dirección"] = self.obtener_direccion()
         self.direccion_actual += tam
 
@@ -86,6 +91,19 @@ class TablaSimbolos:
             if s.get("Identificador") == identificador or s.get("identificador") == identificador:
                 return s
         return None
+
+    def entrar_ambito(self, nombre):
+        self.pila_ambitos.append(nombre)
+
+    def salir_ambito(self):
+        if len(self.pila_ambitos) > 1:
+            self.pila_ambitos.pop()
+
+    def ambito_actual(self):
+        return self.pila_ambitos[-1]
+
+    def en_clase(self):
+        return any(a["tipo"] == "clase" for a in self.pila_ambitos)
 
 
 tabla = TablaSimbolos()
