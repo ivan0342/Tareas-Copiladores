@@ -18,9 +18,9 @@ class Parser:
         raise ParserError(mensaje)
 
     def match_multiple(self, *tipos):
-        token = self.actual()  # ← aquí estaba el error
-        if token and token["tipo"] in tipos:
-            self.i += 1  # avanzar
+        if self.i < len(self.tokens) and self.tokens[self.i]["tipo"] in tipos:
+            token = self.tokens[self.i]
+            self.i += 1
             return token
         return None
 
@@ -31,16 +31,24 @@ class Parser:
             return {"tipo": "EOF", "token": "EOF", "linea": -1, "columna": -1}
 
     def match(self, tipo_esperado):
-        tok = self.actual()
-        if tok["tipo"] == tipo_esperado:
+        if self.check(tipo_esperado):
+            token = self.tokens[self.i]
             self.i += 1
-            return tok
+            return token
         else:
-            self.errores.append(
-                f"Error sintáctico en línea {tok['linea']}: se esperaba {tipo_esperado}, se encontró {tok['tipo']} ('{tok['token']}')"
-            )
-            self.i += 1
+            # Manejo de error: devuelve None pero registra el problema
+            if self.i < len(self.tokens):
+                actual = self.tokens[self.i]
+                print(
+                    f"[Error sintáctico] Se esperaba '{tipo_esperado}', pero se encontró '{actual['tipo']}' en línea {actual['linea']}")
+            else:
+                print(f"[Error sintáctico] Se esperaba '{tipo_esperado}', pero se llegó al final del archivo.")
             return None
+
+    def check(self, tipo_esperado):
+        if self.i >= len(self.tokens):
+            return False
+        return self.tokens[self.i]["tipo"] == tipo_esperado
 
     def parse(self):
         while self.actual()["tipo"] != "EOF":
@@ -279,7 +287,8 @@ class Parser:
         self.match("LLAVE_IZQ")
 
         # Entrar al ámbito de clase
-        self.tabla_simbolos.entrar_ambito(nombre)
+        self.tabla_simbolos.entrar_ambito(f"clase:{nombre}")
+
 
         atributos = []
         metodos = []
@@ -361,7 +370,12 @@ class Parser:
         if self.actual()["tipo"] != "PAREN_DER":
             while True:
                 tipo_param = self.match(self.actual()["tipo"])["token"]
-                id_param = self.match("IDENTIFICADOR")["token"]
+                id_token = self.match("IDENTIFICADOR")
+                if id_token is None:
+                    self.error("Se esperaba un identificador en los parámetros de la función")
+                    return None
+                id_param = id_token["token"]
+
                 parametros.append((tipo_param, id_param))
                 if self.actual()["tipo"] != "COMA":
                     break
@@ -370,7 +384,7 @@ class Parser:
         self.match("PAREN_DER")
 
         # Entrar ámbito función
-        self.tabla_simbolos.entrar_ambito(nombre)
+        self.tabla_simbolos.entrar_ambito(f"func:{nombre}")
 
         for tipo_param, id_param in parametros:
             self.tabla_simbolos.insertar({

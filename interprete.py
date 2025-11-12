@@ -13,8 +13,14 @@ class Interprete:
     def __init__(self, output=print):
         self.memoria = {}
         self.output = output
-        self.funciones = {}  # nombre → nodo función
-        self.clases = {}  # nombre → nodo clase
+        self.funciones = {}
+        self.clases = {}
+
+        # Inicializar memoria con variables globales
+        for simbolo in tabla.obtener_todos():
+            if simbolo.get("categoria") == "variable" and simbolo.get("ambito") == "Global":
+                self.memoria[simbolo["identificador"]] = simbolo.get("valor")
+
 
     def ejecutar_programa(self, ast):
         resultado = None
@@ -89,9 +95,17 @@ class Interprete:
 
         if tipo == "VAR":
             name = nodo["id"]
-            if name not in self.memoria:
-                raise RuntimeErrorInterp(f"Variable no declarada: {name}")
-            return self.memoria[name]
+            # Buscar en memoria local
+            if name in self.memoria:
+                return self.memoria[name]
+
+            # Buscar en la tabla de símbolos global si no está en memoria
+            simbolo = tabla.buscar(name)
+            if simbolo:
+                return simbolo.get("Valor") or simbolo.get("valor")
+
+            # Si no está en ninguno, error
+            raise RuntimeErrorInterp(f"Símbolo '{name}' no encontrado en la tabla.")
 
         if tipo == "NUEVO":
             return self.crear_objeto(nodo["clase"], nodo["args"])

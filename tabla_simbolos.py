@@ -96,14 +96,14 @@ class TablaSimbolos:
         self.pila_ambitos.append(nombre)
 
     def salir_ambito(self):
-        if len(self.pila_ambitos) > 1:
+        if self.pila_ambitos:
             self.pila_ambitos.pop()
 
     def ambito_actual(self):
-        return self.pila_ambitos[-1]
+        return self.pila_ambitos[-1] if self.pila_ambitos else "Global"
 
     def en_clase(self):
-        return any(a["tipo"] == "clase" for a in self.pila_ambitos)
+        return any(isinstance(a, str) and a.startswith("clase:") for a in self.pila_ambitos)
 
 
 tabla = TablaSimbolos()

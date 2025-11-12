@@ -1,0 +1,63 @@
+[
+    {
+        "identificador": "nombre",
+        "categoria": "variable",
+        "tipo_dato": "cadena",
+        "linea": 71,
+        "ambito": "clase:Persona",
+        "direccion": 86,
+        "valor": null,
+        "estado": "declarado",
+        "estructura": "-",
+        "contador_referencias": 1,
+        "Dirección": "0x000A"
+    },
+    {
+        "identificador": "edad",
+        "categoria": "variable",
+        "tipo_dato": "entero",
+        "linea": 72,
+        "ambito": "clase:Persona",
+        "direccion": 90,
+        "valor": null,
+        "estado": "declarado",
+        "estructura": "-",
+        "contador_referencias": 1,
+        "Dirección": "0x000B"
+    },
+    {
+        "identificador": "Persona",
+        "categoria": "clase",
+        "tipo_dato": "-",
+        "linea": -1,
+        "ambito": "Global",
+        "direccion": null,
+        "valor": "Hereda: SerVivo",
+        "estado": "definida",
+        "estructura": "Clase",
+        "contador_referencias": 0,
+        "Dirección": "0x000C"
+    },
+    {
+        "identificador": "calificacion",
+        "categoria": "variable",
+        "tipo_dato": "flotante",
+        "linea": 84,
+        "ambito": "clase:Estudiante",
+        "direccion": 98,
+        "valor": null,
+        "estado": "declarado",
+        "estructura": "-",
+        "contador_referencias": 1,
+        "Dirección": "0x000D"
+    },
+    {
+        "identificador": "J",
+        "categoria": "parámetro",
+        "tipo_dato": "=",
+        "estado": "inicializado",
+        "ambito": "func:inicial",
+        "valor": null,
+        "Dirección": "0x000E"
+    }
+]
