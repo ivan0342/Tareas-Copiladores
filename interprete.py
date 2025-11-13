@@ -130,6 +130,16 @@ class Interprete:
             metodo = clase["metodos"][nodo["metodo"]]
             args = [obj] + [self.ejecutar(a) for a in nodo["args"]]
             return self.llamar_funcion(metodo["nombre"], args)
+        
+        if tipo == "MANEJO_ERRORES":
+            try:
+                self.ejecutar(nodo["intento"])
+            except RuntimeErrorInterp as e:
+                # Crear variable del error en memoria
+                error_var = nodo["error"]["token"] if isinstance(nodo["error"], dict) else nodo["error"]
+                self.memoria[error_var] = str(e)
+                self.ejecutar(nodo["captura"])
+            return None
 
 
     def llamar_funcion(self, nombre, args_nodos):

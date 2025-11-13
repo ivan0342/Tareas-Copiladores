@@ -87,7 +87,9 @@ class Parser:
         # --- Clase ---
         elif tipo == "CLASE":
             return self.declaracion_clase()
-
+        # --- Interfaz ---
+        elif tipo == "INTERFAZ":
+            return self.declaracion_interfaz()
         # --- Condicional ---
         elif tipo == "SI":
             return self.condicional()
@@ -116,6 +118,10 @@ class Parser:
         
         elif tipo == "HACER":
             return self.bucle_hacer_mientras()
+        
+        elif tipo == "INTENTAR":
+            return self.manejo_errores()
+
 
         # --- Caso por defecto ---
         else:
@@ -250,31 +256,64 @@ class Parser:
         self.match("PARA")
         self.match("PAREN_IZQ")
 
-        # inicialización (puede ser declaración o asignación)
+        # --- Inicialización ---
         init = None
         if self.actual()["tipo"] in ("TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_BOOLEANO", "TIPO_CARACTER", "TIPO_CADENA"):
             init = self.declaracion_variable()
         elif self.actual()["tipo"] == "IDENTIFICADOR":
             init = self.asignacion()
         else:
-            self.match("PUNTO_Y_COMA")  # si está vacío
+            # si no hay nada antes del primer ';'
+            self.match("PUNTO_Y_COMA")
 
-        # condición
+        # --- Condición ---
         cond = None
         if self.actual()["tipo"] != "PUNTO_Y_COMA":
             cond = self.expresion()
         self.match("PUNTO_Y_COMA")
 
-        # incremento
+        # --- Incremento ---
         inc = None
         if self.actual()["tipo"] != "PAREN_DER":
-            inc = self.expresion()
+            if self.actual()["tipo"] == "IDENTIFICADOR":
+                id_token = self.match("IDENTIFICADOR")
+                if self.actual()["tipo"] in ("ASIGNACION", "INCREMENTO", "DECREMENTO"):
+                    op_token = self.match(self.actual()["tipo"])
+
+                    if op_token["tipo"] == "ASIGNACION":
+                        valor = self.expresion()
+                        inc = {
+                            "nodo": "ASIGNACION",
+                            "id": id_token,
+                            "op": op_token,
+                            "valor": valor
+                        }
+                    else:
+                        # incremento o decremento tipo i++ o i--
+                        inc = {
+                            "nodo": "UNARIO",
+                            "id": id_token,
+                            "op": op_token
+                        }
+                else:
+                    # caso raro: solo identificador sin operador
+                    inc = {"nodo": "IDENTIFICADOR", "token": id_token}
+            else:
+                inc = self.expresion()
 
         self.match("PAREN_DER")
 
+        # --- Cuerpo del bucle ---
         cuerpo = self.bloque()
-        return {"nodo": "PARA", "init": init, "cond": cond, "inc": inc, "cuerpo": cuerpo}
-    
+
+        return {
+            "nodo": "PARA",
+            "init": init,
+            "cond": cond,
+            "inc": inc,
+            "cuerpo": cuerpo
+        }
+
     def bucle_hacer_mientras(self):
         self.match("HACER")
         cuerpo = self.bloque()
@@ -357,27 +396,57 @@ class Parser:
 
     def factor(self):
         tok = self.actual()
+
+        # Literales numéricos
         if tok["tipo"] == "ENTERO_LIT":
             self.match("ENTERO_LIT")
             return {"nodo": "LIT_INT", "valor": int(tok["token"])}
+
         if tok["tipo"] == "FLOTANTE_LIT":
             self.match("FLOTANTE_LIT")
             return {"nodo": "LIT_FLOAT", "valor": float(tok["token"])}
+
         if tok["tipo"] == "CADENA_LIT":
             self.match("CADENA_LIT")
             return {"nodo": "LIT_STR", "valor": tok["token"].strip('"')}
+
         if tok["tipo"] == "BOOLEANO_LIT":
             self.match("BOOLEANO_LIT")
             return {"nodo": "LIT_BOOL", "valor": tok["token"] == "true"}
+
+        # Identificador o llamada a función
         if tok["tipo"] == "IDENTIFICADOR":
+            nombre = tok["token"]
             self.match("IDENTIFICADOR")
-            return {"nodo": "VAR", "id": tok["token"]}
+
+            # Si sigue un paréntesis, es una llamada a función
+            if self.check("PAREN_IZQ"):
+                self.match("PAREN_IZQ")
+                argumentos = []
+
+                # Si no está vacío
+                if not self.check("PAREN_DER"):
+                    argumentos.append(self.expresion())
+                    while self.check("COMA"):
+                        self.match("COMA")
+                        argumentos.append(self.expresion())
+
+                self.match("PAREN_DER")
+                return {"nodo": "LLAMADA_FUNCION", "id": nombre, "args": argumentos}
+
+            # Si no hay paréntesis, es solo una variable
+            return {"nodo": "VAR", "id": nombre}
+
+        # Expresión entre paréntesis
         if tok["tipo"] == "PAREN_IZQ":
             self.match("PAREN_IZQ")
             nodo = self.expresion()
             self.match("PAREN_DER")
             return nodo
+
+        # Si nada coincide
         raise ParserError(f"Factor inválido en línea {tok['linea']}: {tok['token']}")
+
 
     # -------------------------------------------------------
     # DEFINICION DE CLASES
@@ -489,7 +558,12 @@ class Parser:
 
         self.match("PAREN_DER")
 
-        # Entrar ámbito función
+        # ✅ Soporte para funciones sin cuerpo (p. ej. dentro de interfaces)
+        if self.check("PUNTO_Y_COMA"):
+            self.match("PUNTO_Y_COMA")
+            return {"nodo": "DECLARACION_FUNCION_INTERFAZ", "nombre": nombre, "params": parametros, "cuerpo": None}
+
+        # Entrar ámbito función normal
         self.tabla_simbolos.entrar_ambito(f"func:{nombre}")
 
         for tipo_param, id_param in parametros:
@@ -519,6 +593,7 @@ class Parser:
 
         return {"nodo": "FUNCION", "nombre": nombre, "params": parametros, "cuerpo": bloque_func}
 
+
     def parametros(self):
         params = []
         if self.actual()["tipo"] in ("TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_BOOLEANO", "TIPO_CARACTER", "TIPO_CADENA"):
@@ -530,3 +605,105 @@ class Parser:
                     break
                 self.match("COMA")
         return params
+    
+    def llamada_funcion(self):
+        nombre = self.match("IDENTIFICADOR")["token"]
+        self.match("PAREN_IZQ")
+        args = []
+
+        if self.actual()["tipo"] != "PAREN_DER":
+            args.append(self.expresion())
+            while self.actual()["tipo"] == "COMA":
+                self.match("COMA")
+                args.append(self.expresion())
+
+        self.match("PAREN_DER")
+
+        return {"nodo": "LLAMADA_FUNCION", "nombre": nombre, "args": args}
+
+    #Manejo de errores
+    
+    def manejo_errores(self):
+        self.match("INTENTAR")
+        try_bloque = self.bloque()
+
+        self.match("CAPTURAR")
+        self.match("PAREN_IZQ")
+        error_var = self.match("IDENTIFICADOR")["token"]
+        self.match("PAREN_DER")
+
+        catch_bloque = self.bloque()
+
+        return {
+            "nodo": "INTENTAR",
+            "try": try_bloque,
+            "error_var": error_var,
+            "catch": catch_bloque
+        }
+
+    # -------------------------------------------------------
+    # DEFINICION DE INTERFAZ
+    # -------------------------------------------------------
+    def declaracion_interfaz(self):
+        self.match("INTERFAZ")
+        token_nombre = self.match("IDENTIFICADOR")
+        nombre = token_nombre["token"]
+        linea = token_nombre["linea"]
+
+        self.match("LLAVE_IZQ")
+        metodos = []
+
+        while self.actual()["tipo"] != "LLAVE_DER" and self.actual()["tipo"] != "EOF":
+            if self.actual()["tipo"] in (
+                "TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_BOOLEANO",
+                "TIPO_CARACTER", "TIPO_CADENA", "TIPO_VACIO"
+            ):
+                metodos.append(self.metodo_interfaz())
+            else:
+                self.error(f"Token inesperado dentro de la interfaz: {self.actual()['token']}")
+
+        self.match("LLAVE_DER")
+
+        simbolo = {
+            "identificador": nombre,
+            "categoria": "interfaz",
+            "tipo_dato": "-",
+            "linea": linea,
+            "ambito": "Global",
+            "valor": "Interfaz definida",
+            "estado": "definida",
+            "estructura": "Interfaz"
+        }
+        self.tabla_simbolos.insertar(simbolo)
+
+        return {"nodo": "INTERFAZ", "nombre": nombre, "metodos": metodos}
+
+
+    def metodo_interfaz(self):
+        tipo = self.match(self.actual()["tipo"])["token"]
+        nombre = self.match("IDENTIFICADOR")["token"]
+
+        self.match("PAREN_IZQ")
+        parametros = []
+        if self.actual()["tipo"] != "PAREN_DER":
+            while True:
+                tipo_param = self.match(self.actual()["tipo"])["token"]
+                id_token = self.match("IDENTIFICADOR")
+                id_param = id_token["token"]
+                parametros.append((tipo_param, id_param))
+                if self.actual()["tipo"] != "COMA":
+                    break
+                self.match("COMA")
+        self.match("PAREN_DER")
+
+        # Permitir métodos sin cuerpo (terminados en ;)
+        if self.check("PUNTO_Y_COMA"):
+            self.match("PUNTO_Y_COMA")
+            return {"nodo": "METODO_INTERFAZ", "nombre": nombre, "tipo": tipo, "params": parametros}
+
+        # Si no hay punto y coma, intentar leer un bloque (aunque no es usual en interfaz)
+        cuerpo = []
+        if self.check("LLAVE_IZQ"):
+            cuerpo = self.bloque()
+
+        return {"nodo": "METODO_INTERFAZ", "nombre": nombre, "tipo": tipo, "params": parametros, "cuerpo": cuerpo}

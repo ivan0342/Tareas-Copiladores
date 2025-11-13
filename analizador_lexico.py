@@ -1,4 +1,3 @@
-# analizador_lexico.py
 import re
 
 class AnalizadorLexico:
@@ -8,7 +7,7 @@ class AnalizadorLexico:
         self.errores_lexicos = []
         self.ambito = "Global"
 
-        # Map de palabras reservadas -> token tipo (aprovechamos la versión del compañero)
+        # Palabras reservadas
         self.reservadas = {
             "entero": "TIPO_ENTERO",
             "flotante": "TIPO_FLOTANTE",
@@ -41,13 +40,10 @@ class AnalizadorLexico:
             "imprimir": "IMPRIMIR",
             "verdadero": "BOOLEANO_LIT",
             "falso": "BOOLEANO_LIT",
-            "vacio" : "TIPO_VACIO"
+            "vacio": "TIPO_VACIO"
         }
 
-        # Patrón principal: loada operadores compuestos primero
-        # Usamos (?P<NAME>...) para saber qué match fue
-                # Patrón principal: operadores compuestos primero, y soporte para char entre comillas simples
-        # Usamos (?P<NAME>...) para saber qué match fue
+        # Expresiones regulares
         self.token_regex = re.compile(r'''
             (?P<COMMENT_LINE>//[^\n]*) |
             (?P<COMMENT_BLOCK>/\*[\s\S]*?\*/) |
@@ -56,6 +52,7 @@ class AnalizadorLexico:
             (?P<NUMBER_INT>\d+) |
             (?P<STRING>"(?:[^"\\]|\\.)*") |
             (?P<CHAR>'(?:[^'\\]|\\.)') |
+            (?P<BAD_CHAR>'[^']{2,}') |
             (?P<IDENT>[A-Za-z_][A-Za-z0-9_]*) |
             (?P<BAD_IDENT>\d+[A-Za-z_][A-Za-z0-9_]*) |
             (?P<OP>[+\-*/%!=<>]) |
@@ -63,8 +60,6 @@ class AnalizadorLexico:
             (?P<WHITESPACE>\s+)
         ''', re.VERBOSE)
 
-
-        # Map de operadores/símbolos a tokens (estilo compañero)
         self.mapping_ops = {
             "+": "MAS", "-": "MENOS", "*": "MULT", "/": "DIV", "%": "MOD",
             "++": "INCREMENTO", "--": "DECREMENTO",
@@ -79,18 +74,15 @@ class AnalizadorLexico:
         }
 
     def tokenize(self, texto):
-        """Devuelve (tokens, errores). Cada token: {'token':lexema,'tipo':tipo,'linea':L,'col':C}"""
         self.tokens_validos = []
         self.errores_lexicos = []
-
         lines = texto.splitlines(keepends=True)
-        # iteramos por líneas para poder calcular columna exacta
+
         for lineno, line in enumerate(lines, start=1):
             pos = 0
             while pos < len(line):
                 m = self.token_regex.match(line, pos)
                 if not m:
-                    # Caracter inesperado -> error léxico en esa columna
                     bad_char = line[pos]
                     self.errores_lexicos.append({
                         "token": bad_char,
@@ -104,21 +96,32 @@ class AnalizadorLexico:
 
                 kind = m.lastgroup
                 lexeme = m.group(kind)
-                start_col = m.start() + 1  # columna 1-index
+                start_col = m.start() + 1
                 pos = m.end()
 
-                # Ignorar whitespace y comentarios (pero registrar posición en caso de error)
-                if kind == "WHITESPACE" or kind == "COMMENT_LINE" or kind == "COMMENT_BLOCK":
+                if kind in ("WHITESPACE", "COMMENT_LINE", "COMMENT_BLOCK"):
                     continue
 
-                # Identificadores / reservadas
+                # --- Identificadores o palabras reservadas ---
                 if kind == "IDENT":
-                    low = lexeme  # usar literal; tu gramática ya está en español
-                    if low in self.reservadas:
-                        tipo = self.reservadas[low]
+                    # 1️Si es palabra reservada
+                    if lexeme in self.reservadas:
+                        tipo = self.reservadas[lexeme]
+
+                    # 2️ Si se parece a una palabra reservada mal escrita
+                    elif any(lexeme.lower() != r and lexeme.lower().startswith(r) for r in self.reservadas):
+                        self.errores_lexicos.append({
+                            "token": lexeme,
+                            "tipo": "ERROR_PALABRA_RESERVADA_INVALIDA",
+                            "linea": lineno,
+                            "columna": start_col,
+                            "mensaje": f"Posible palabra reservada mal escrita: '{lexeme}'"
+                        })
+                        continue
+
+                    # 3 Si es identificador válido
                     else:
                         tipo = "IDENTIFICADOR"
-                        # Insertar en tabla de símbolos (si aplica)
                         if self.tabla_simbolos:
                             simbolo = {
                                 "identificador": lexeme,
@@ -132,11 +135,9 @@ class AnalizadorLexico:
                                 "estructura": None,
                                 "contador_referencias": 0
                             }
-                            # Asegúrate que tu tabla_simbolos tenga método insertar_simbolo
                             try:
                                 self.tabla_simbolos.insertar_simbolo(simbolo)
                             except Exception:
-                                # no interrumpir por errores en tabla
                                 pass
 
                     self.tokens_validos.append({
@@ -147,91 +148,52 @@ class AnalizadorLexico:
                     })
                     continue
 
-                # Identificador mal formado (ej: 123abc)
                 if kind == "BAD_IDENT":
                     self.errores_lexicos.append({
                         "token": lexeme,
                         "tipo": "ERROR_IDENTIFICADOR_INVALIDO",
                         "linea": lineno,
                         "columna": start_col,
-                        "mensaje": "Identificador inválido (comienza con dígito)"
+                        "mensaje": "Identificador inválido: comienza con número"
                     })
                     continue
 
-                # Numeros
                 if kind == "NUMBER_FLOAT":
                     tipo = "FLOTANTE_LIT"
-                    self.tokens_validos.append({
-                        "token": lexeme,
-                        "tipo": tipo,
-                        "linea": lineno,
-                        "columna": start_col
-                    })
-                    continue
-                if kind == "NUMBER_INT":
+                elif kind == "NUMBER_INT":
                     tipo = "ENTERO_LIT"
-                    self.tokens_validos.append({
-                        "token": lexeme,
-                        "tipo": tipo,
-                        "linea": lineno,
-                        "columna": start_col
-                    })
-                    continue
-
-                # Strings
-                if kind == "STRING":
+                elif kind == "STRING":
                     tipo = "CADENA_LIT"
-                    self.tokens_validos.append({
-                        "token": lexeme,
-                        "tipo": tipo,
-                        "linea": lineno,
-                        "columna": start_col
-                    })
-                    continue
-                
-                 # Caracter literal (ej: 'J')
-                if kind == "CHAR":
-                    # guardar sin las comillas si quieres: lexeme[1] o limpio
-                    ch = lexeme[1:-1]  # sin comillas
+                elif kind == "CHAR":
                     tipo = "CARACTER_LIT"
-                    self.tokens_validos.append({
-                        "token": ch,
-                        "tipo": tipo,
+                elif kind == "BAD_CHAR":
+                    self.errores_lexicos.append({
+                        "token": lexeme,
+                        "tipo": "ERROR_CARACTER_INVALIDO",
                         "linea": lineno,
-                        "columna": start_col
+                        "columna": start_col,
+                        "mensaje": "Literal de caracter inválido (debe contener solo un carácter entre comillas simples)"
                     })
                     continue
-                
-                # Operadores compuestos y simples
-                if kind == "OP_COMP" or kind == "OP":
-                    # mapear con mapping_ops (si está), sino dejar tal cual
+                elif kind in ("OP_COMP", "OP"):
                     tipo = self.mapping_ops.get(lexeme, "OP")
-                    self.tokens_validos.append({
-                        "token": lexeme,
-                        "tipo": tipo,
-                        "linea": lineno,
-                        "columna": start_col
-                    })
-                    continue
-
-                # Símbolos
-                if kind == "SYM":
+                elif kind == "SYM":
                     tipo = self.mapping_ops.get(lexeme, lexeme)
-                    self.tokens_validos.append({
+                else:
+                    self.errores_lexicos.append({
                         "token": lexeme,
-                        "tipo": tipo,
+                        "tipo": "ERROR_DESCONOCIDO",
                         "linea": lineno,
-                        "columna": start_col
+                        "columna": start_col,
+                        "mensaje": "Token no identificado correctamente"
                     })
                     continue
 
-                # Cualquier otro caso no esperado:
-                self.errores_lexicos.append({
+                self.tokens_validos.append({
                     "token": lexeme,
-                    "tipo": "ERROR_DESCONOCIDO",
+                    "tipo": tipo,
                     "linea": lineno,
-                    "columna": start_col,
-                    "mensaje": "Token no identificado correctamente"
+                    "columna": start_col
                 })
 
         return self.tokens_validos, self.errores_lexicos
