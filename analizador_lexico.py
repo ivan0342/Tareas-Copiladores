@@ -40,7 +40,8 @@ class AnalizadorLexico:
             "constante": "CONSTANTE",
             "imprimir": "IMPRIMIR",
             "verdadero": "BOOLEANO_LIT",
-            "falso": "BOOLEANO_LIT"
+            "falso": "BOOLEANO_LIT",
+            "vacio" : "TIPO_VACIO"
         }
 
         # Patrón principal: loada operadores compuestos primero

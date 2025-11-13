@@ -70,7 +70,7 @@ class Parser:
         tipo = actual["tipo"]
 
         # --- Declaración de función o variable ---
-        if tipo in ("TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_BOOLEANO", "TIPO_CARACTER", "TIPO_CADENA", "VACIO"):
+        if tipo in ("TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_BOOLEANO", "TIPO_CARACTER", "TIPO_CADENA", "TIPO_VACIO"):
             # Verificar que haya tokens siguientes
             if self.i + 2 < len(self.tokens):
                 sig1 = self.tokens[self.i + 1]["tipo"]
@@ -107,7 +107,16 @@ class Parser:
         # --- Asignación o llamada ---
         elif tipo == "IDENTIFICADOR":
             return self.asignacion()
-    
+
+        elif tipo == "SEGUN":
+            return self.sentencia_segun()
+        
+        elif tipo == "PARA":
+            return self.bucle_para()
+        
+        elif tipo == "HACER":
+            return self.bucle_hacer_mientras()
+
         # --- Caso por defecto ---
         else:
             self.errores.append(
@@ -193,8 +202,41 @@ class Parser:
 
         return {"nodo": "SI", "cond": condicion, "then": bloque_then, "else": bloque_else}
 
+    def sentencia_segun(self):
+        self.match("SEGUN")
+        self.match("PAREN_IZQ")
+        expr = self.expresion()
+        self.match("PAREN_DER")
+        self.match("LLAVE_IZQ")
+
+        casos = []
+        defecto = None
+
+        while self.actual()["tipo"] != "LLAVE_DER" and self.actual()["tipo"] != "EOF":
+            if self.actual()["tipo"] == "CASO":
+                self.match("CASO")
+                valor = self.expresion()
+                self.match("DOS_PUNTOS")
+                sentencias = []
+                while self.actual()["tipo"] not in ("CASO", "DEFECTO", "LLAVE_DER", "EOF"):
+                    sentencias.append(self.declaracion_o_sentencia())
+                casos.append({"valor": valor, "sentencias": sentencias})
+            elif self.actual()["tipo"] == "DEFECTO":
+                self.match("DEFECTO")
+                self.match("DOS_PUNTOS")
+                sentencias = []
+                while self.actual()["tipo"] not in ("LLAVE_DER", "EOF"):
+                    sentencias.append(self.declaracion_o_sentencia())
+                defecto = sentencias
+                break
+            else:
+                self.error(f"Token inesperado en 'segun': {self.actual()['tipo']}")
+
+        self.match("LLAVE_DER")
+
+        return {"nodo": "SEGUN", "expr": expr, "casos": casos, "defecto": defecto}
     # -------------------------------------------------------
-    # BUCLE MIENTRAS
+    # BUCLES
     # -------------------------------------------------------
     def bucle_mientras(self):
         self.match("MIENTRAS")
@@ -203,6 +245,47 @@ class Parser:
         self.match("PAREN_DER")
         cuerpo = self.bloque()
         return {"nodo": "MIENTRAS", "cond": cond, "cuerpo": cuerpo}
+    
+    def bucle_para(self):
+        self.match("PARA")
+        self.match("PAREN_IZQ")
+
+        # inicialización (puede ser declaración o asignación)
+        init = None
+        if self.actual()["tipo"] in ("TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_BOOLEANO", "TIPO_CARACTER", "TIPO_CADENA"):
+            init = self.declaracion_variable()
+        elif self.actual()["tipo"] == "IDENTIFICADOR":
+            init = self.asignacion()
+        else:
+            self.match("PUNTO_Y_COMA")  # si está vacío
+
+        # condición
+        cond = None
+        if self.actual()["tipo"] != "PUNTO_Y_COMA":
+            cond = self.expresion()
+        self.match("PUNTO_Y_COMA")
+
+        # incremento
+        inc = None
+        if self.actual()["tipo"] != "PAREN_DER":
+            inc = self.expresion()
+
+        self.match("PAREN_DER")
+
+        cuerpo = self.bloque()
+        return {"nodo": "PARA", "init": init, "cond": cond, "inc": inc, "cuerpo": cuerpo}
+    
+    def bucle_hacer_mientras(self):
+        self.match("HACER")
+        cuerpo = self.bloque()
+        self.match("MIENTRAS")
+        self.match("PAREN_IZQ")
+        cond = self.expresion()
+        self.match("PAREN_DER")
+        self.match("PUNTO_Y_COMA")
+        return {"nodo": "HACERMIENTRAS", "cond": cond, "cuerpo": cuerpo}
+
+
 
     # -------------------------------------------------------
     # IMPRIMIR
@@ -354,7 +437,7 @@ class Parser:
     def metodo_de_clase(self):
         # Tipo de retorno
         tipo_token = self.match_multiple(
-            "TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_CADENA", "TIPO_BOOLEANO", "TIPO_CARACTER"
+            "TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_CADENA", "TIPO_BOOLEANO", "TIPO_CARACTER", "TIPO_VACIO"
         )
         if tipo_token is None:
             self.error("Se esperaba un tipo de dato en la declaración del método")
