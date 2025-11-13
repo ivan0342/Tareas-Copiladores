@@ -141,5 +141,247 @@
         "estructura": "-",
         "contador_referencias": 1,
         "Dirección": "0x0012"
+    },
+    {
+        "identificador": "contador",
+        "categoria": "variable",
+        "tipo_dato": "entero",
+        "linea": 13,
+        "ambito": "func:main",
+        "direccion": 168,
+        "valor": {
+            "nodo": "LIT_INT",
+            "valor": 0
+        },
+        "estado": "inicializado",
+        "estructura": "-",
+        "contador_referencias": 1,
+        "Dirección": "0x0013"
+    },
+    {
+        "identificador": "promedio",
+        "categoria": "variable",
+        "tipo_dato": "flotante",
+        "linea": 14,
+        "ambito": "func:main",
+        "direccion": 172,
+        "valor": {
+            "nodo": "LIT_FLOAT",
+            "valor": 9.75
+        },
+        "estado": "inicializado",
+        "estructura": "-",
+        "contador_referencias": 1,
+        "Dirección": "0x0014"
+    },
+    {
+        "identificador": "activo",
+        "categoria": "variable",
+        "tipo_dato": "booleano",
+        "linea": 15,
+        "ambito": "func:main",
+        "direccion": 180,
+        "valor": {
+            "nodo": "LIT_BOOL",
+            "valor": false
+        },
+        "estado": "inicializado",
+        "estructura": "-",
+        "contador_referencias": 1,
+        "Dirección": "0x0015"
+    },
+    {
+        "identificador": "mensaje",
+        "categoria": "variable",
+        "tipo_dato": "cadena",
+        "linea": 17,
+        "ambito": "func:main",
+        "direccion": 184,
+        "valor": {
+            "nodo": "LIT_STR",
+            "valor": "Hola mundo"
+        },
+        "estado": "inicializado",
+        "estructura": "-",
+        "contador_referencias": 1,
+        "Dirección": "0x0016"
+    },
+    {
+        "identificador": "MAX_INTENTOS",
+        "categoria": "variable",
+        "tipo_dato": "entero",
+        "linea": 18,
+        "ambito": "func:main",
+        "direccion": 226,
+        "valor": {
+            "nodo": "LIT_INT",
+            "valor": 3
+        },
+        "estado": "inicializado",
+        "estructura": "-",
+        "contador_referencias": 1,
+        "Dirección": "0x0017"
+    },
+    {
+        "identificador": "calcularPromedio",
+        "categoria": "función",
+        "tipo_dato": "flotante",
+        "valor": [
+            [
+                "entero",
+                "suma"
+            ],
+            [
+                "entero",
+                "total"
+            ]
+        ],
+        "estado": "definida",
+        "ambito": "func:main",
+        "estructura": "Función",
+        "Dirección": "0x001B"
+    },
+    {
+        "identificador": "nombre",
+        "categoria": "variable",
+        "tipo_dato": "cadena",
+        "linea": 71,
+        "ambito": "clase:Persona",
+        "direccion": 250,
+        "valor": null,
+        "estado": "declarado",
+        "estructura": "-",
+        "contador_referencias": 1,
+        "Dirección": "0x001C"
+    },
+    {
+        "identificador": "edad",
+        "categoria": "variable",
+        "tipo_dato": "entero",
+        "linea": 72,
+        "ambito": "clase:Persona",
+        "direccion": 254,
+        "valor": null,
+        "estado": "declarado",
+        "estructura": "-",
+        "contador_referencias": 1,
+        "Dirección": "0x001D"
+    },
+    {
+        "identificador": "Persona",
+        "categoria": "clase",
+        "tipo_dato": "-",
+        "linea": 70,
+        "ambito": "func:main",
+        "direccion": null,
+        "valor": "Hereda: SerVivo",
+        "estado": "definida",
+        "estructura": "Clase",
+        "contador_referencias": 0,
+        "Dirección": "0x001E"
+    },
+    {
+        "identificador": "Mostrable",
+        "categoria": "interfaz",
+        "tipo_dato": "-",
+        "linea": 79,
+        "ambito": "func:main",
+        "valor": "Interfaz definida",
+        "estado": "definida",
+        "estructura": "Interfaz",
+        "Dirección": "0x001F"
+    },
+    {
+        "identificador": "calificacion",
+        "categoria": "variable",
+        "tipo_dato": "flotante",
+        "linea": 84,
+        "ambito": "clase:Estudiante",
+        "direccion": 266,
+        "valor": null,
+        "estado": "declarado",
+        "estructura": "-",
+        "contador_referencias": 1,
+        "Dirección": "0x0020"
+    },
+    {
+        "identificador": "contador",
+        "categoria": "variable",
+        "tipo_dato": "entero",
+        "linea": 112,
+        "ambito": "func:main",
+        "direccion": 274,
+        "valor": {
+            "nodo": "LIT_INT",
+            "valor": 0
+        },
+        "estado": "inicializado",
+        "estructura": "-",
+        "contador_referencias": 1,
+        "Dirección": "0x0021"
+    },
+    {
+        "identificador": "promedio",
+        "categoria": "variable",
+        "tipo_dato": "flotante",
+        "linea": 113,
+        "ambito": "func:main",
+        "direccion": 278,
+        "valor": {
+            "nodo": "LIT_FLOAT",
+            "valor": 9.75
+        },
+        "estado": "inicializado",
+        "estructura": "-",
+        "contador_referencias": 1,
+        "Dirección": "0x0022"
+    },
+    {
+        "identificador": "activo",
+        "categoria": "variable",
+        "tipo_dato": "booleano",
+        "linea": 114,
+        "ambito": "func:main",
+        "direccion": 286,
+        "valor": {
+            "nodo": "LIT_BOOL",
+            "valor": false
+        },
+        "estado": "inicializado",
+        "estructura": "-",
+        "contador_referencias": 1,
+        "Dirección": "0x0023"
+    },
+    {
+        "identificador": "mensaje",
+        "categoria": "variable",
+        "tipo_dato": "cadena",
+        "linea": 116,
+        "ambito": "func:main",
+        "direccion": 290,
+        "valor": {
+            "nodo": "LIT_STR",
+            "valor": "Hola mundo"
+        },
+        "estado": "inicializado",
+        "estructura": "-",
+        "contador_referencias": 1,
+        "Dirección": "0x0024"
+    },
+    {
+        "identificador": "MAX_INTENTOS",
+        "categoria": "variable",
+        "tipo_dato": "entero",
+        "linea": 117,
+        "ambito": "func:main",
+        "direccion": 332,
+        "valor": {
+            "nodo": "LIT_INT",
+            "valor": 3
+        },
+        "estado": "inicializado",
+        "estructura": "-",
+        "contador_referencias": 1,
+        "Dirección": "0x0025"
     }
 ]

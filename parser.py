@@ -38,10 +38,11 @@ class Parser:
             # Manejo de error: devuelve None pero registra el problema
             if self.i < len(self.tokens):
                 actual = self.tokens[self.i]
-                print(
-                    f"[Error sintáctico] Se esperaba '{tipo_esperado}', pero se encontró '{actual['tipo']}' en línea {actual['linea']}")
+                print(f"[Error sintáctico] Se esperaba '{tipo_esperado}', pero se encontró '{actual['tipo']}' en línea {actual['linea']}")
+                self.errores.append(f"Se esperaba '{tipo_esperado}', pero se encontró '{actual['tipo']}' en línea {actual['linea']}")
             else:
                 print(f"[Error sintáctico] Se esperaba '{tipo_esperado}', pero se llegó al final del archivo.")
+                self.errores.append(f"Se esperaba '{tipo_esperado}', pero se llegó al final del archivo.")
             return None
 
     def check(self, tipo_esperado):
@@ -125,8 +126,9 @@ class Parser:
 
         # --- Caso por defecto ---
         else:
+            print(f"[Error sintáctico] Token inesperado '{actual['tipo']}' en línea {actual['linea']}")
             self.errores.append(
-                f"Token inesperado '{actual['tipo']}' en línea {actual['linea']}"
+                f"[Error sintáctico] Token inesperado '{actual['tipo']}' en línea {actual['linea']}"
             )
             self.i += 1
             return None
@@ -138,35 +140,59 @@ class Parser:
         tipo_token = self.match(self.actual()["tipo"])
         tipo = tipo_token["token"] if tipo_token else "desconocido"
 
-        if self.actual()["tipo"] == "IDENTIFICADOR":
-            nombre = self.match("IDENTIFICADOR")["token"]
-            linea = self.actual()["linea"]
-            valor = None
+        # Verificar si el siguiente token es IDENTIFICADOR
+        if self.actual()["tipo"] != "IDENTIFICADOR":
+            self.errores.append(f"[Error sintáctico] Error: se esperaba un identificador después del tipo '{tipo}' en línea {self.actual()['linea']}.")
+            print(f"[Error sintáctico] Se esperaba un identificador después del tipo '{tipo}' en línea {self.actual()['linea']}.")
+            # Intentamos sincronizar saltando hasta el siguiente ';' para no romper el análisis
+            while self.actual()["tipo"] != "PUNTO_Y_COMA" and self.actual()["tipo"] != "EOF":
+                self.i += 1
+            if self.check("PUNTO_Y_COMA"):
+                self.match("PUNTO_Y_COMA")
+            return None
 
-            if self.actual()["tipo"] == "ASIGNACION":
-                self.match("ASIGNACION")
+        # Si hay identificador, seguimos normalmente
+        nombre = self.match("IDENTIFICADOR")["token"]
+        linea = self.actual()["linea"]
+        valor = None
+
+        # Si hay signo de asignación, pero no hay expresión válida después
+        if self.actual()["tipo"] == "ASIGNACION":
+            self.match("ASIGNACION")
+
+            # Si lo que sigue es ';' o fin de archivo, no hay valor asignado
+            if self.actual()["tipo"] in ("PUNTO_Y_COMA", "EOF"):
+                self.errores.append(f"[Error sintáctico] Error: falta una expresión después del signo '=' en la variable '{nombre}' (línea {linea}).")
+                print(f"[Error sintáctico] Error: falta una expresión después del signo '=' en la variable '{nombre}' (línea {linea}).")
+            else:
                 valor = self.expresion()
 
-            self.match("PUNTO_Y_COMA")
+        # Verificar que la declaración termine con ';'
+        if not self.check("PUNTO_Y_COMA"):
+            self.errores.append(f"[Error sintáctico] Error: falta ';' al final de la declaración de la variable '{nombre}' (línea {linea}).")
+            print(f"[Error sintáctico] Error: falta ';' al final de la declaración de la variable '{nombre}' (línea {linea}).")
+            # Intentamos sincronizar hasta el siguiente ';' o EOF
+            while self.actual()["tipo"] != "PUNTO_Y_COMA" and self.actual()["tipo"] != "EOF":
+                self.i += 1
 
-            simbolo = {
-                "identificador": nombre,
-                "categoria": "variable",
-                "tipo_dato": tipo,
-                "linea": linea,
-                "ambito": "Global",
-                "direccion": self.tabla_simbolos.direccion_actual,
-                "valor": valor,
-                "estado": "inicializado" if valor else "declarado",
-                "estructura": "-",
-                "contador_referencias": 1
-            }
-            self.tabla_simbolos.insertar(simbolo)
+        self.match("PUNTO_Y_COMA")
 
-            return {"nodo": "DECL_VAR", "tipo": tipo, "id": nombre, "valor": valor, "linea": linea}
-        else:
-            self.errores.append("Error: se esperaba un identificador en la declaración de variable.")
-            return None
+        simbolo = {
+            "identificador": nombre,
+            "categoria": "variable",
+            "tipo_dato": tipo,
+            "linea": linea,
+            "ambito": "Global",
+            "direccion": self.tabla_simbolos.direccion_actual,
+            "valor": valor,
+            "estado": "inicializado" if valor else "declarado",
+            "estructura": "-",
+            "contador_referencias": 1
+        }
+        self.tabla_simbolos.insertar(simbolo)
+
+        return {"nodo": "DECL_VAR", "tipo": tipo, "id": nombre, "valor": valor, "linea": linea}
+
 
     # -------------------------------------------------------
     # ASIGNACIÓN
@@ -184,11 +210,13 @@ class Parser:
                 self.tabla_simbolos.actualizar(nombre, valor)
                 simbolo["estado"] = "actualizado"
             else:
-                self.errores.append(f"Variable '{nombre}' no declarada.")
+                self.errores.append(f"[Error sintáctico] Variable '{nombre}' no declarada.")
+                print(f"[Error sintáctico] Variable '{nombre}' no declarada.")
 
             return {"nodo": "ASIGNACION", "id": nombre, "valor": valor, "linea": self.actual()["linea"]}
         else:
-            self.errores.append(f"Error: se esperaba '=' después de {nombre}")
+            self.errores.append(f"[Error sintáctico] Error: se esperaba '=' después de {nombre}")
+            print(f"[Error sintáctico] Error: se esperaba '=' después de {nombre}")
             return None
 
     # -------------------------------------------------------

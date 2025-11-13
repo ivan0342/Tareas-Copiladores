@@ -31,8 +31,7 @@ class AnalizadorSintactico:
             ast = parser.parse()
         except ParserError as e:
             # Parser levanta en el primer error. Devolvemos mensaje útil.
-            errores.append(str(e))
-            return errores
+            errores  = parser.errores
 
         # 2) Recorrer AST para poblar/update tabla de símbolos (declaraciones y asignaciones)
         #try:
