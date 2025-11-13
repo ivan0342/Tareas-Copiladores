@@ -1,4 +1,3 @@
-# archivo: parser.py
 from tabla_simbolos import TablaSimbolos
 
 class ParserError(Exception):
@@ -67,27 +66,53 @@ class Parser:
     # DECISIONES PRINCIPALES
     # -------------------------------------------------------
     def declaracion_o_sentencia(self):
-        tipo = self.actual()["tipo"]
-        # Solo es declaración de variable si NO estamos dentro de una clase
-        if tipo in ("TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_BOOLEANO", "TIPO_CARACTER",
-                    "TIPO_CADENA") and not self.tabla_simbolos.en_clase():
-            return self.declaracion_variable()
-        elif tipo == "IDENTIFICADOR":
-            return self.asignacion()
-        elif tipo == "SI":
-            return self.condicional()
-        elif tipo == "MIENTRAS":
-            return self.bucle_mientras()
-        elif tipo == "IMPRIMIR":
-            return self.imprimir_sentencia()
-        elif tipo == "LLAVE_IZQ":
-            return self.bloque()
+        actual = self.actual()
+        tipo = actual["tipo"]
+
+        # --- Declaración de función o variable ---
+        if tipo in ("TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_BOOLEANO", "TIPO_CARACTER", "TIPO_CADENA", "VACIO"):
+            # Verificar que haya tokens siguientes
+            if self.i + 2 < len(self.tokens):
+                sig1 = self.tokens[self.i + 1]["tipo"]
+                sig2 = self.tokens[self.i + 2]["tipo"]
+
+                # Si viene IDENTIFICADOR + PAREN_IZQ -> es función
+                if sig1 == "IDENTIFICADOR" and sig2 == "PAREN_IZQ":
+                    return self.declaracion_funcion()
+                else:
+                    return self.declaracion_variable()
+            else:
+                return self.declaracion_variable()
+
+        # --- Clase ---
         elif tipo == "CLASE":
             return self.declaracion_clase()
-        elif tipo in ("TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_BOOLEANO", "TIPO_CARACTER", "TIPO_CADENA", "VACIO"):
-            return self.declaracion_funcion()
+
+        # --- Condicional ---
+        elif tipo == "SI":
+            return self.condicional()
+
+        # --- Bucle ---
+        elif tipo == "MIENTRAS":
+            return self.bucle_mientras()
+
+        # --- Imprimir ---
+        elif tipo == "IMPRIMIR":
+            return self.imprimir_sentencia()
+
+        # --- Bloque ---
+        elif tipo == "LLAVE_IZQ":
+            return self.bloque()
+
+        # --- Asignación o llamada ---
+        elif tipo == "IDENTIFICADOR":
+            return self.asignacion()
+    
+        # --- Caso por defecto ---
         else:
-            self.errores.append(f"Token inesperado '{self.actual()['tipo']}' en línea {self.actual()['linea']}")
+            self.errores.append(
+                f"Token inesperado '{actual['tipo']}' en línea {actual['linea']}"
+            )
             self.i += 1
             return None
 
@@ -277,7 +302,9 @@ class Parser:
 
     def declaracion_clase(self):
         self.match("CLASE")
-        nombre = self.match("IDENTIFICADOR")["token"]
+        token_nombre = self.match("IDENTIFICADOR")
+        nombre = token_nombre["token"]
+        linea = token_nombre["linea"]
 
         base = None
         if self.actual()["tipo"] == "HEREDA":
@@ -289,16 +316,12 @@ class Parser:
         # Entrar al ámbito de clase
         self.tabla_simbolos.entrar_ambito(f"clase:{nombre}")
 
-
         atributos = []
         metodos = []
 
         while self.actual()["tipo"] != "LLAVE_DER":
-
-            # Detectar si es método (después del tipo y nombre viene '(')
             if self.actual()["tipo"] in (
-            "TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_BOOLEANO", "TIPO_CARACTER", "TIPO_CADENA"):
-                # Mirar adelante 2 tokens (tipo IDENT '(' )
+                "TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_BOOLEANO", "TIPO_CARACTER", "TIPO_CADENA"):
                 if (self.tokens[self.i + 1]["tipo"] == "IDENTIFICADOR"
                         and self.tokens[self.i + 2]["tipo"] == "PAREN_IZQ"):
                     metodos.append(self.metodo_de_clase())
@@ -309,14 +332,13 @@ class Parser:
 
         self.match("LLAVE_DER")
 
-        # Salir del ámbito
         self.tabla_simbolos.salir_ambito()
 
         simbolo = {
             "identificador": nombre,
             "categoria": "clase",
             "tipo_dato": "-",
-            "linea": -1,
+            "linea": linea,
             "ambito": "Global",
             "direccion": None,
             "valor": f"Hereda: {base}" if base else "Clase base",
@@ -327,6 +349,7 @@ class Parser:
         self.tabla_simbolos.insertar(simbolo)
 
         return {"nodo": "CLASE", "nombre": nombre, "base": base, "atributos": atributos, "metodos": metodos}
+
 
     def metodo_de_clase(self):
         # Tipo de retorno
@@ -424,4 +447,3 @@ class Parser:
                     break
                 self.match("COMA")
         return params
-

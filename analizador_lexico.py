@@ -1,4 +1,4 @@
-# analizador_lexico_unificado.py
+# analizador_lexico.py
 import re
 
 class AnalizadorLexico:
@@ -45,13 +45,16 @@ class AnalizadorLexico:
 
         # Patrón principal: loada operadores compuestos primero
         # Usamos (?P<NAME>...) para saber qué match fue
+                # Patrón principal: operadores compuestos primero, y soporte para char entre comillas simples
+        # Usamos (?P<NAME>...) para saber qué match fue
         self.token_regex = re.compile(r'''
             (?P<COMMENT_LINE>//[^\n]*) |
             (?P<COMMENT_BLOCK>/\*[\s\S]*?\*/) |
-            (?P<OP_COMP>==|!=|<=|>=|&&|\|\||\+\+|--) |
+            (?P<OP_COMP>==|!=|<=|>=|&&|\|\||\+=|-=|\*=|/=|%=|\+\+|--) |
             (?P<NUMBER_FLOAT>\d+\.\d+) |
             (?P<NUMBER_INT>\d+) |
             (?P<STRING>"(?:[^"\\]|\\.)*") |
+            (?P<CHAR>'(?:[^'\\]|\\.)') |
             (?P<IDENT>[A-Za-z_][A-Za-z0-9_]*) |
             (?P<BAD_IDENT>\d+[A-Za-z_][A-Za-z0-9_]*) |
             (?P<OP>[+\-*/%!=<>]) |
@@ -59,11 +62,13 @@ class AnalizadorLexico:
             (?P<WHITESPACE>\s+)
         ''', re.VERBOSE)
 
+
         # Map de operadores/símbolos a tokens (estilo compañero)
         self.mapping_ops = {
             "+": "MAS", "-": "MENOS", "*": "MULT", "/": "DIV", "%": "MOD",
             "++": "INCREMENTO", "--": "DECREMENTO",
             "=": "ASIGNACION", "==": "IGUAL", "!=": "DISTINTO",
+            "+=": "ASIGNACION", "-=": "ASIGNACION", "*=": "ASIGNACION", "/=": "ASIGNACION", "%=": "ASIGNACION",
             "<": "MENOR", ">": "MAYOR", "<=": "MENOR_IGUAL", ">=": "MAYOR_IGUAL",
             "&&": "AND", "||": "OR", "!": "NOT",
             "(": "PAREN_IZQ", ")": "PAREN_DER",
@@ -182,7 +187,20 @@ class AnalizadorLexico:
                         "columna": start_col
                     })
                     continue
-
+                
+                 # Caracter literal (ej: 'J')
+                if kind == "CHAR":
+                    # guardar sin las comillas si quieres: lexeme[1] o limpio
+                    ch = lexeme[1:-1]  # sin comillas
+                    tipo = "CARACTER_LIT"
+                    self.tokens_validos.append({
+                        "token": ch,
+                        "tipo": tipo,
+                        "linea": lineno,
+                        "columna": start_col
+                    })
+                    continue
+                
                 # Operadores compuestos y simples
                 if kind == "OP_COMP" or kind == "OP":
                     # mapear con mapping_ops (si está), sino dejar tal cual
