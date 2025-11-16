@@ -70,20 +70,33 @@ class Parser:
         actual = self.actual()
         tipo = actual["tipo"]
 
+        # --- Importar, Exportar, Usar ---
+        if tipo == "IMPORTAR":
+            return self.declaracion_importar()
+        elif tipo == "EXPORTAR":
+            return self.declaracion_exportar()
+        elif tipo == "USAR":
+            return self.declaracion_usar()
+
+        # --- Constante ---
+        elif tipo == "CONSTANTE":
+            return self.declaracion_constante()
+
         # --- Declaración de función o variable ---
-        if tipo in ("TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_BOOLEANO", "TIPO_CARACTER", "TIPO_CADENA", "TIPO_VACIO"):
-            # Verificar que haya tokens siguientes
+        elif tipo in ("TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_BOOLEANO", "TIPO_CARACTER", "TIPO_CADENA", "TIPO_VACIO"):
             if self.i + 2 < len(self.tokens):
                 sig1 = self.tokens[self.i + 1]["tipo"]
                 sig2 = self.tokens[self.i + 2]["tipo"]
-
-                # Si viene IDENTIFICADOR + PAREN_IZQ -> es función
                 if sig1 == "IDENTIFICADOR" and sig2 == "PAREN_IZQ":
                     return self.declaracion_funcion()
                 else:
                     return self.declaracion_variable()
             else:
                 return self.declaracion_variable()
+
+        # --- Declaración de variable con tipo clase (IDENTIFICADOR + IDENTIFICADOR) ---
+        elif tipo == "IDENTIFICADOR" and self._es_declaracion_clase():
+            return self.declaracion_variable_con_clase()
 
         # --- Clase ---
         elif tipo == "CLASE":
@@ -103,26 +116,33 @@ class Parser:
         elif tipo == "IMPRIMIR":
             return self.imprimir_sentencia()
 
+        # --- Sentencias de control ---
+        elif tipo == "ROMPER":
+            return self.sentencia_romper()
+        elif tipo == "CONTINUAR":
+            return self.sentencia_continuar()
+        elif tipo == "RETORNAR":
+            return self.sentencia_retornar()
+
         # --- Bloque ---
         elif tipo == "LLAVE_IZQ":
             return self.bloque()
 
         # --- Asignación o llamada ---
         elif tipo == "IDENTIFICADOR":
-            return self.asignacion()
+            return self.asignacion_o_llamada()
 
         elif tipo == "SEGUN":
             return self.sentencia_segun()
-        
+
         elif tipo == "PARA":
             return self.bucle_para()
-        
+
         elif tipo == "HACER":
             return self.bucle_hacer_mientras()
-        
+
         elif tipo == "INTENTAR":
             return self.manejo_errores()
-
 
         # --- Caso por defecto ---
         else:
@@ -133,17 +153,195 @@ class Parser:
             self.i += 1
             return None
 
+    def _es_declaracion_clase(self):
+        """Determina si es una declaración de variable con tipo de clase"""
+        if self.i + 1 < len(self.tokens):
+            siguiente = self.tokens[self.i + 1]
+            # Patrón: IDENTIFICADOR (clase) + IDENTIFICADOR (nombre variable)
+            return siguiente["tipo"] == "IDENTIFICADOR"
+        return False
+
+    def declaracion_variable_con_clase(self):
+        """Maneja declaraciones como: Persona p = nuevo Persona();"""
+        tipo_clase = self.match("IDENTIFICADOR")["token"]
+        nombre = self.match("IDENTIFICADOR")["token"]
+        linea = self.actual()["linea"]
+        valor = None
+
+        # Si hay asignación
+        if self.actual()["tipo"] == "ASIGNACION":
+            self.match("ASIGNACION")
+            if self.actual()["tipo"] not in ("PUNTO_Y_COMA", "EOF"):
+                try:
+                    valor = self.expresion()
+                except Exception as e:
+                    self.errores.append(f"[Error sintáctico] Error al analizar expresión en variable '{nombre}': {e}")
+                    # Sincronizar
+                    while self.actual()["tipo"] != "PUNTO_Y_COMA" and self.actual()["tipo"] != "EOF":
+                        self.i += 1
+
+        # Verificar punto y coma
+        if not self.check("PUNTO_Y_COMA"):
+            self.errores.append(f"[Error sintáctico] Error: falta ';' en declaración de '{nombre}'")
+            while self.actual()["tipo"] != "PUNTO_Y_COMA" and self.actual()["tipo"] != "EOF":
+                self.i += 1
+
+        if self.check("PUNTO_Y_COMA"):
+            self.match("PUNTO_Y_COMA")
+
+        # Insertar en tabla de símbolos
+        simbolo = {
+            "identificador": nombre,
+            "categoria": "variable",
+            "tipo_dato": tipo_clase,  # Usar el nombre de la clase como tipo
+            "linea": linea,
+            "ambito": "Global",
+            "direccion": self.tabla_simbolos.obtener_direccion(),
+            "valor": self._obtener_valor_literal(valor) if valor else None,
+            "estado": "inicializado" if valor else "declarado",
+            "estructura": "-",
+            "contador_referencias": 1
+        }
+        try:
+            self.tabla_simbolos.insertar(simbolo)
+        except Exception as e:
+            print(f"Error al insertar símbolo {nombre}: {e}")
+
+        return {"nodo": "DECL_VAR", "tipo": tipo_clase, "id": nombre, "valor": valor, "linea": linea}
+
+    # -------------------------------------------------------
+
+    def declaracion_importar(self):
+        self.match("IMPORTAR")
+        nombre = self.match("IDENTIFICADOR")["token"]
+        self.match("PUNTO_Y_COMA")
+        return {"nodo": "IMPORTAR", "modulo": nombre}
+
+    def declaracion_exportar(self):
+        self.match("EXPORTAR")
+        nombre = self.match("IDENTIFICADOR")["token"]
+        self.match("PUNTO_Y_COMA")
+        return {"nodo": "EXPORTAR", "elemento": nombre}
+
+    def declaracion_usar(self):
+        self.match("USAR")
+        nombre = self.match("IDENTIFICADOR")["token"]
+        self.match("PUNTO_Y_COMA")
+        return {"nodo": "USAR", "biblioteca": nombre}
+
+    def declaracion_constante(self):
+        self.match("CONSTANTE")
+        tipo_token = self.match(self.actual()["tipo"])
+        tipo = tipo_token["token"]
+        nombre = self.match("IDENTIFICADOR")["token"]
+        self.match("ASIGNACION")
+        valor = self.expresion()
+        self.match("PUNTO_Y_COMA")
+
+        simbolo = {
+            "identificador": nombre,
+            "categoria": "constante",
+            "tipo_dato": tipo,
+            "linea": self.actual()["linea"],
+            "ambito": "Global",
+            "direccion": self.tabla_simbolos.direccion_actual,
+            "valor": valor,
+            "estado": "inicializado",
+            "estructura": "-",
+            "contador_referencias": 1
+        }
+        self.tabla_simbolos.insertar(simbolo)
+
+        return {"nodo": "CONSTANTE", "tipo": tipo, "id": nombre, "valor": valor}
+
+    # -------------------------------------------------------
+
+    def asignacion_o_llamada(self):
+        nombre = self.match("IDENTIFICADOR")["token"]
+        linea = self.actual()["linea"]
+
+        # Si es llamada a función/método
+        if self.actual()["tipo"] == "PAREN_IZQ":
+            self.match("PAREN_IZQ")
+            args = []
+            if self.actual()["tipo"] != "PAREN_DER":
+                args.append(self.expresion())
+                while self.actual()["tipo"] == "COMA":
+                    self.match("COMA")
+                    args.append(self.expresion())
+            self.match("PAREN_DER")
+            self.match("PUNTO_Y_COMA")
+            return {"nodo": "LLAMADA_FUNCION", "id": nombre, "args": args, "linea": linea}
+
+        # Si es acceso a método de objeto
+        elif self.actual()["tipo"] == "PUNTO":
+            self.match("PUNTO")
+            metodo = self.match("IDENTIFICADOR")["token"]
+            self.match("PAREN_IZQ")
+            args = []
+            if self.actual()["tipo"] != "PAREN_DER":
+                args.append(self.expresion())
+                while self.actual()["tipo"] == "COMA":
+                    self.match("COMA")
+                    args.append(self.expresion())
+            self.match("PAREN_DER")
+            self.match("PUNTO_Y_COMA")
+            return {"nodo": "LLAMADA_METODO", "obj": nombre, "metodo": metodo, "args": args, "linea": linea}
+
+        # Si es asignación
+        elif self.actual()["tipo"] == "ASIGNACION":
+            self.match("ASIGNACION")
+            valor = self.expresion()
+            self.match("PUNTO_Y_COMA")
+
+            simbolo = self.tabla_simbolos.buscar(nombre)
+            if simbolo:
+                self.tabla_simbolos.actualizar(nombre, valor)
+                simbolo["estado"] = "actualizado"
+            else:
+                self.errores.append(f"[Error semántico] Variable '{nombre}' no declarada.")
+                print(f"[Error semántico] Variable '{nombre}' no declarada.")
+
+            return {"nodo": "ASIGNACION", "id": nombre, "valor": valor, "linea": linea}
+
+        else:
+            self.errores.append(f"[Error sintáctico] Se esperaba '=' o '(' después de {nombre}")
+            return None
+
+        # ----------------------------------------------
+
+    def sentencia_romper(self):
+        self.match("ROMPER")
+        self.match("PUNTO_Y_COMA")
+        return {"nodo": "ROMPER"}
+
+    def sentencia_continuar(self):
+        self.match("CONTINUAR")
+        self.match("PUNTO_Y_COMA")
+        return {"nodo": "CONTINUAR"}
+
+    def sentencia_retornar(self):
+        self.match("RETORNAR")
+        valor = None
+        if self.actual()["tipo"] != "PUNTO_Y_COMA":
+            valor = self.expresion()
+        self.match("PUNTO_Y_COMA")
+        return {"nodo": "RETORNAR", "valor": valor}
+
     # -------------------------------------------------------
     # DECLARACIÓN DE VARIABLES
     # -------------------------------------------------------
     def declaracion_variable(self):
         tipo_token = self.match(self.actual()["tipo"])
         tipo = tipo_token["token"] if tipo_token else "desconocido"
+        linea = tipo_token["linea"]
 
         # Verificar si el siguiente token es IDENTIFICADOR
         if self.actual()["tipo"] != "IDENTIFICADOR":
-            self.errores.append(f"[Error sintáctico] Error: se esperaba un identificador después del tipo '{tipo}' en línea {self.actual()['linea']}.")
-            print(f"[Error sintáctico] Se esperaba un identificador después del tipo '{tipo}' en línea {self.actual()['linea']}.")
+            self.errores.append(
+                f"[Error sintáctico] Error: se esperaba un identificador después del tipo '{tipo}' en línea {self.actual()['linea']}.")
+            print(
+                f"[Error sintáctico] Se esperaba un identificador después del tipo '{tipo}' en línea {self.actual()['linea']}.")
             # Intentamos sincronizar saltando hasta el siguiente ';' para no romper el análisis
             while self.actual()["tipo"] != "PUNTO_Y_COMA" and self.actual()["tipo"] != "EOF":
                 self.i += 1
@@ -153,45 +351,79 @@ class Parser:
 
         # Si hay identificador, seguimos normalmente
         nombre = self.match("IDENTIFICADOR")["token"]
-        linea = self.actual()["linea"]
         valor = None
 
-        # Si hay signo de asignación, pero no hay expresión válida después
+        # Si hay signo de asignación, procesar la expresión
         if self.actual()["tipo"] == "ASIGNACION":
             self.match("ASIGNACION")
 
-            # Si lo que sigue es ';' o fin de archivo, no hay valor asignado
+            # Verificar que haya una expresión válida después del =
             if self.actual()["tipo"] in ("PUNTO_Y_COMA", "EOF"):
-                self.errores.append(f"[Error sintáctico] Error: falta una expresión después del signo '=' en la variable '{nombre}' (línea {linea}).")
-                print(f"[Error sintáctico] Error: falta una expresión después del signo '=' en la variable '{nombre}' (línea {linea}).")
+                self.errores.append(
+                    f"[Error sintáctico] Error: falta una expresión después del signo '=' en la variable '{nombre}' (línea {linea}).")
+                print(
+                    f"[Error sintáctico] Error: falta una expresión después del signo '=' en la variable '{nombre}' (línea {linea}).")
             else:
-                valor = self.expresion()
+                try:
+                    # Usar expresion() para analizar el valor
+                    valor = self.expresion()
+                except Exception as e:
+                    self.errores.append(f"[Error sintáctico] Error al analizar expresión en variable '{nombre}': {e}")
+                    print(f"[Error sintáctico] Error al analizar expresión en variable '{nombre}': {e}")
+                    # Sincronizar
+                    while self.actual()["tipo"] != "PUNTO_Y_COMA" and self.actual()["tipo"] != "EOF":
+                        self.i += 1
 
         # Verificar que la declaración termine con ';'
         if not self.check("PUNTO_Y_COMA"):
-            self.errores.append(f"[Error sintáctico] Error: falta ';' al final de la declaración de la variable '{nombre}' (línea {linea}).")
-            print(f"[Error sintáctico] Error: falta ';' al final de la declaración de la variable '{nombre}' (línea {linea}).")
+            self.errores.append(
+                f"[Error sintáctico] Error: falta ';' al final de la declaración de la variable '{nombre}' (línea {linea}).")
+            print(
+                f"[Error sintáctico] Error: falta ';' al final de la declaración de la variable '{nombre}' (línea {linea}).")
             # Intentamos sincronizar hasta el siguiente ';' o EOF
             while self.actual()["tipo"] != "PUNTO_Y_COMA" and self.actual()["tipo"] != "EOF":
                 self.i += 1
 
-        self.match("PUNTO_Y_COMA")
+        if self.check("PUNTO_Y_COMA"):
+            self.match("PUNTO_Y_COMA")
 
-        simbolo = {
-            "identificador": nombre,
-            "categoria": "variable",
-            "tipo_dato": tipo,
-            "linea": linea,
-            "ambito": "Global",
-            "direccion": self.tabla_simbolos.direccion_actual,
-            "valor": valor,
-            "estado": "inicializado" if valor else "declarado",
-            "estructura": "-",
-            "contador_referencias": 1
-        }
-        self.tabla_simbolos.insertar(simbolo)
+        # Solo insertar en tabla de símbolos si no hubo errores graves
+        if nombre and "desconocido" not in tipo:
+            simbolo = {
+                "identificador": nombre,
+                "categoria": "variable",
+                "tipo_dato": tipo,
+                "linea": linea,
+                "ambito": "Global",
+                "direccion": self.tabla_simbolos.obtener_direccion(),
+                "valor": self._obtener_valor_literal(valor) if valor else None,
+                "estado": "inicializado" if valor else "declarado",
+                "estructura": "-",
+                "contador_referencias": 1
+            }
+            try:
+                self.tabla_simbolos.insertar(simbolo)
+            except Exception as e:
+                print(f"Error al insertar símbolo {nombre}: {e}")
 
         return {"nodo": "DECL_VAR", "tipo": tipo, "id": nombre, "valor": valor, "linea": linea}
+
+    def _obtener_valor_literal(self, nodo):
+        """Extrae el valor literal de un nodo AST para la tabla de símbolos"""
+        if nodo is None:
+            return None
+        if isinstance(nodo, dict):
+            if nodo.get("nodo") == "LIT_INT":
+                return nodo.get("valor")
+            elif nodo.get("nodo") == "LIT_FLOAT":
+                return nodo.get("valor")
+            elif nodo.get("nodo") == "LIT_STR":
+                return nodo.get("valor")
+            elif nodo.get("nodo") == "LIT_BOOL":
+                return nodo.get("valor")
+            elif nodo.get("nodo") == "VAR":
+                return f"<ref:{nodo.get('id')}>"
+        return str(nodo)
 
 
     # -------------------------------------------------------
@@ -438,6 +670,13 @@ class Parser:
             self.match("CADENA_LIT")
             return {"nodo": "LIT_STR", "valor": tok["token"].strip('"')}
 
+        # En el metodo factor(), añade esto después de los otros literales:
+        if tok["tipo"] == "CARACTER_LIT":
+            self.match("CARACTER_LIT")
+            # Extraer el valor del caracter (remover comillas si es necesario)
+            valor_caracter = tok["token"].strip("'") if "'" in tok["token"] else tok["token"]
+            return {"nodo": "LIT_CHAR", "valor": valor_caracter}
+
         if tok["tipo"] == "BOOLEANO_LIT":
             self.match("BOOLEANO_LIT")
             return {"nodo": "LIT_BOOL", "valor": tok["token"] == "true"}
@@ -464,6 +703,20 @@ class Parser:
 
             # Si no hay paréntesis, es solo una variable
             return {"nodo": "VAR", "id": nombre}
+
+        # En el método factor(), añade después del caso de identificador:
+        if tok["tipo"] == "NUEVO":
+            self.match("NUEVO")
+            clase = self.match("IDENTIFICADOR")["token"]
+            self.match("PAREN_IZQ")
+            args = []
+            if self.actual()["tipo"] != "PAREN_DER":
+                args.append(self.expresion())
+                while self.actual()["tipo"] == "COMA":
+                    self.match("COMA")
+                    args.append(self.expresion())
+            self.match("PAREN_DER")
+            return {"nodo": "NUEVO", "clase": clase, "args": args}
 
         # Expresión entre paréntesis
         if tok["tipo"] == "PAREN_IZQ":
@@ -499,19 +752,27 @@ class Parser:
         atributos = []
         metodos = []
 
-        while self.actual()["tipo"] != "LLAVE_DER":
+        while self.actual()["tipo"] != "LLAVE_DER" and self.actual()["tipo"] != "EOF":
+            # Reconocer tanto atributos como métodos
             if self.actual()["tipo"] in (
-                "TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_BOOLEANO", "TIPO_CARACTER", "TIPO_CADENA"):
-                if (self.tokens[self.i + 1]["tipo"] == "IDENTIFICADOR"
-                        and self.tokens[self.i + 2]["tipo"] == "PAREN_IZQ"):
-                    metodos.append(self.metodo_de_clase())
+                    "TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_BOOLEANO", "TIPO_CARACTER",
+                    "TIPO_CADENA", "TIPO_VACIO"):
+
+                # Mirar adelante para determinar si es método o atributo
+                if self.i + 2 < len(self.tokens):
+                    sig1 = self.tokens[self.i + 1]["tipo"]
+                    sig2 = self.tokens[self.i + 2]["tipo"]
+
+                    if sig1 == "IDENTIFICADOR" and sig2 == "PAREN_IZQ":
+                        metodos.append(self.metodo_de_clase())
+                    else:
+                        atributos.append(self.declaracion_variable())
                 else:
                     atributos.append(self.declaracion_variable())
             else:
                 self.error(f"Token inesperado dentro de la clase: {self.actual()['token']}")
 
         self.match("LLAVE_DER")
-
         self.tabla_simbolos.salir_ambito()
 
         simbolo = {

@@ -2,25 +2,33 @@
 
 from tabla_simbolos import tabla
 
+
 class RuntimeErrorInterp(Exception):
     pass
+
 
 class ReturnSignal(Exception):
     def __init__(self, valor):
         self.valor = valor
 
+
 class Interprete:
-    def __init__(self, output=print):
+    def __init__(self, output=print, tabla_simbolos=None):
         self.memoria = {}
         self.output = output
         self.funciones = {}
         self.clases = {}
+        self.tabla_simbolos = tabla_simbolos or tabla  # Usar la tabla proporcionada o la global
 
-        # Inicializar memoria con variables globales
-        for simbolo in tabla.obtener_todos():
-            if simbolo.get("categoria") == "variable" and simbolo.get("ambito") == "Global":
-                self.memoria[simbolo["identificador"]] = simbolo.get("valor")
-
+        # Inicializar memoria con variables globales desde la tabla de símbolos
+        if self.tabla_simbolos:
+            for simbolo in self.tabla_simbolos.obtener_todos():
+                if simbolo.get("categoria") == "variable" and simbolo.get("ambito") == "Global":
+                    identificador = simbolo.get("identificador") or simbolo.get("Identificador")
+                    valor = simbolo.get("valor") or simbolo.get("Valor")
+                    if identificador:
+                        self.memoria[identificador] = valor
+                        print(f"DEBUG: Inicializada variable global '{identificador}' = {valor}")
 
     def ejecutar_programa(self, ast):
         resultado = None
@@ -29,6 +37,9 @@ class Interprete:
         return resultado
 
     def ejecutar(self, nodo):
+        if nodo is None:
+            return None
+
         tipo = nodo.get("nodo")
 
         # -------------------------
@@ -38,18 +49,57 @@ class Interprete:
             val = None
             if nodo.get("valor") is not None:
                 val = self.ejecutar(nodo["valor"])
-            self.memoria[nodo["id"]] = val
-            tabla.actualizar(nodo["id"], val)  # ✅
-            return None
 
+            nombre = nodo["id"]
+            self.memoria[nombre] = val
+
+            # Actualizar también en la tabla de símbolos
+            if self.tabla_simbolos:
+                simbolo_existente = self.tabla_simbolos.buscar(nombre)
+                if simbolo_existente:
+                    self.tabla_simbolos.actualizar(nombre, val)
+                else:
+                    # Si no existe, crear uno nuevo
+                    nuevo_simbolo = {
+                        "identificador": nombre,
+                        "categoria": "variable",
+                        "tipo_dato": nodo.get("tipo"),
+                        "valor": val,
+                        "estado": "inicializado" if val is not None else "declarado",
+                        "ambito": "Global",
+                        "linea": nodo.get("linea", -1)
+                    }
+                    self.tabla_simbolos.insertar(nuevo_simbolo)
+
+            print(f"DEBUG: Declarada variable '{nombre}' = {val}")
+            return None
 
         if tipo == "ASIGNACION":
             val = self.ejecutar(nodo["valor"])
-            if nodo["id"] not in self.memoria:
+            nombre = nodo["id"]
+
+            if nombre not in self.memoria:
+                # Buscar en la tabla de símbolos
+                if self.tabla_simbolos:
+                    simbolo = self.tabla_simbolos.buscar(nombre)
+                    if simbolo:
+                        # La variable existe en la tabla pero no en memoria local
+                        self.memoria[nombre] = val
+                        self.tabla_simbolos.actualizar(nombre, val)
+                        print(f"DEBUG: Asignada variable existente '{nombre}' = {val}")
+                        return val
+
                 raise RuntimeErrorInterp(
-                    f"Variable no declarada: {nodo['id']} (línea {nodo.get('linea')})"
+                    f"Variable no declarada: {nombre} (línea {nodo.get('linea')})"
                 )
-            self.memoria[nodo["id"]] = val
+
+            self.memoria[nombre] = val
+
+            # Actualizar también en tabla de símbolos
+            if self.tabla_simbolos:
+                self.tabla_simbolos.actualizar(nombre, val)
+
+            print(f"DEBUG: Asignada variable '{nombre}' = {val}")
             return val
 
         # -------------------------
@@ -58,6 +108,7 @@ class Interprete:
         if tipo == "IMPRIMIR":
             v = self.ejecutar(nodo["valor"])
             self.output(v)
+            print(f"DEBUG: Imprimir: {v}")
             return None
 
         # -------------------------
@@ -65,6 +116,7 @@ class Interprete:
         # -------------------------
         if tipo == "SI":
             cond = self.ejecutar(nodo["cond"])
+            print(f"DEBUG: Condición SI: {cond}")
             if cond:
                 return self.ejecutar(nodo["then"])
             elif nodo.get("else"):
@@ -90,22 +142,51 @@ class Interprete:
         # -------------------------
         # LITERALES Y VARIABLES
         # -------------------------
-        if tipo in ["LIT_INT", "LIT_FLOAT", "LIT_STR"]:
+        if tipo in ["LIT_INT", "LIT_FLOAT", "LIT_STR", "LIT_BOOL", "LIT_CHAR"]:
             return nodo["valor"]
 
         if tipo == "VAR":
             name = nodo["id"]
-            # Buscar en memoria local
-            if name in self.memoria:
-                return self.memoria[name]
+            print(f"DEBUG: Buscando variable '{name}'")
 
-            # Buscar en la tabla de símbolos global si no está en memoria
-            simbolo = tabla.buscar(name)
-            if simbolo:
-                return simbolo.get("Valor") or simbolo.get("valor")
+            # Buscar en memoria local primero
+            if name in self.memoria:
+                valor = self.memoria[name]
+                print(f"DEBUG: Encontrada en memoria local: {valor}")
+                return valor
+
+            # Buscar en la tabla de símbolos global
+            if self.tabla_simbolos:
+                simbolo = self.tabla_simbolos.buscar(name)
+                if simbolo:
+                    # Usar cualquier campo que pueda contener el valor
+                    valor = simbolo.get("valor") or simbolo.get("Valor")
+                    print(f"DEBUG: Encontrada en tabla de símbolos: {valor}")
+
+                    if valor is not None:
+                        # También almacenar en memoria local para acceso futuro
+                        self.memoria[name] = valor
+                        return valor
+                    else:
+                        # Si no hay valor, usar un valor por defecto según el tipo
+                        tipo_dato = simbolo.get("tipo_dato") or simbolo.get("Tipo de dato")
+                        if tipo_dato in ["entero", "TIPO_ENTERO", "int"]:
+                            return 0
+                        elif tipo_dato in ["flotante", "TIPO_FLOTANTE", "float"]:
+                            return 0.0
+                        elif tipo_dato in ["booleano", "TIPO_BOOLEANO", "bool"]:
+                            return False
+                        elif tipo_dato in ["cadena", "TIPO_CADENA", "string"]:
+                            return ""
+                        elif tipo_dato in ["caracter", "TIPO_CARACTER", "char"]:
+                            return ' '
+                        else:
+                            return None
 
             # Si no está en ninguno, error
             raise RuntimeErrorInterp(f"Símbolo '{name}' no encontrado en la tabla.")
+
+        # ... (el resto del código se mantiene igual)
 
         if tipo == "NUEVO":
             return self.crear_objeto(nodo["clase"], nodo["args"])

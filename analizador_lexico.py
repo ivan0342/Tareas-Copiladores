@@ -166,6 +166,11 @@ class AnalizadorLexico:
                     tipo = "CADENA_LIT"
                 elif kind == "CHAR":
                     tipo = "CARACTER_LIT"
+                    # Extrae el valor entre comillas simples
+                    valor = lexeme[1:-1]  # Remueve las comillas simples
+                    # Si es un escape, procesarlo
+                    if len(valor) == 1:
+                        lexeme = valor
                 elif kind == "BAD_CHAR":
                     self.errores_lexicos.append({
                         "token": lexeme,

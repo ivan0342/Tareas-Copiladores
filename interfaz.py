@@ -35,47 +35,71 @@ class Interfaz:
 
     def mostrar_resultados_errores(self, errores_lex, errores_sint):
         ventana_resultados = tk.Toplevel(self.ventana)
-        ventana_resultados.title("Resultados")
-        ventana_resultados.geometry("900x500")
+        ventana_resultados.title("Resultados del Análisis")
+        ventana_resultados.geometry("900x700")
 
-        # Configurar grid de 2 columnas
-        frame = ttk.Frame(ventana_resultados)
-        frame.pack(fill="both", expand=True)
-        frame.columnconfigure(0, weight=1)
-        frame.columnconfigure(1, weight=1)
-        frame.rowconfigure(0, weight=1)
+        # Crear notebook (pestañas)
+        notebook = ttk.Notebook(ventana_resultados)
+        notebook.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Pestaña 1: Errores
+        frame_errores = ttk.Frame(notebook)
+        notebook.add(frame_errores, text="🚨 Errores")
 
         # Errores léxicos
-        lado_izq = ttk.LabelFrame(frame, text="Errores léxicos")
-        lado_izq.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
-        area_errores = tk.Text(lado_izq, wrap=tk.WORD, font=("Consolas", 12), fg="red")
-        area_errores.pack(fill="both", expand=True)
-        scroll_lex = ttk.Scrollbar(lado_izq, command=area_errores.yview)
-        area_errores.configure(yscrollcommand=scroll_lex.set)
-        scroll_lex.pack(side="right", fill="y")
+        frame_lex = ttk.LabelFrame(frame_errores, text="Errores Léxicos")
+        frame_lex.pack(fill="both", expand=True, padx=5, pady=5)
 
-        # Mostrar errores léxicos
+        area_errores_lex = tk.Text(frame_lex, wrap=tk.WORD, font=("Consolas", 10), fg="red")
+        area_errores_lex.pack(fill="both", expand=True, padx=5, pady=5)
+
         if errores_lex:
             for e in errores_lex:
-                area_errores.insert(tk.END, f"[Línea {e['linea']}, {e['tipo']}: '{e['token']}']\n")
+                area_errores_lex.insert(tk.END, f"Línea {e['linea']}: {e['tipo']} - '{e['token']}'\n")
         else:
-            area_errores.insert(tk.END, "No se encontraron errores léxicos.\n")
+            area_errores_lex.insert(tk.END, "✅ No se encontraron errores léxicos\n")
+        area_errores_lex.config(state="disabled")
 
-        # Errores sintácticos
-        lado_der = ttk.LabelFrame(frame, text="Errores sintácticos")
-        lado_der.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
-        area_errores_sint = tk.Text(lado_der, wrap=tk.WORD, font=("Consolas", 12), fg="purple")
-        area_errores_sint.pack(fill="both", expand=True)
-        scroll_sint = ttk.Scrollbar(lado_der, command=area_errores_sint.yview)
-        area_errores_sint.configure(yscrollcommand=scroll_sint.set)
-        scroll_sint.pack(side="right", fill="y")
+        # Pestaña 2: Salida del Intérprete
+        frame_salida = ttk.Frame(notebook)
+        notebook.add(frame_salida, text="📊 Salida")
 
-        # Mostrar errores sintácticos
+        area_salida = tk.Text(frame_salida, wrap=tk.WORD, font=("Consolas", 11),
+                              bg="black", fg="white")
+        area_salida.pack(fill="both", expand=True, padx=10, pady=10)
+
+        scroll_salida = ttk.Scrollbar(frame_salida, command=area_salida.yview)
+        area_salida.configure(yscrollcommand=scroll_salida.set)
+        scroll_salida.pack(side="right", fill="y")
+
+        # Procesar salida del intérprete
+        salida_interprete = []
+        errores_reales = []
+
         if errores_sint:
             for e in errores_sint:
-                area_errores_sint.insert(tk.END, f"{e}\n")
+                if isinstance(e, str) and e.startswith("SALIDA_INTERPRETE:"):
+                    salida_interprete = errores_sint[errores_sint.index(e) + 1:]
+                    break
+                else:
+                    errores_reales.append(e)
+
+        # Mostrar en pestaña de salida
+        if salida_interprete:
+            area_salida.insert(tk.END, "=== EJECUCIÓN EXITOSA ===\n\n")
+            for i, linea in enumerate(salida_interprete, 1):
+                area_salida.insert(tk.END, f"[{i}] {linea}\n")
+            area_salida.insert(tk.END, f"\n🎉 Programa ejecutado correctamente\n")
+            area_salida.insert(tk.END, f"📋 Total de líneas de salida: {len(salida_interprete)}")
         else:
-            area_errores_sint.insert(tk.END, "No se encontraron errores sintácticos.\n")
+            area_salida.insert(tk.END, "=== SIN SALIDA ===\n\n")
+            area_salida.insert(tk.END, "El programa no generó salida o no se ejecutó.\n\n")
+            if errores_reales:
+                area_salida.insert(tk.END, "Se encontraron errores durante el análisis:\n")
+                for error in errores_reales:
+                    area_salida.insert(tk.END, f"• {error}\n")
+
+        area_salida.config(state="disabled")
 
     def mostrar_tabla_tokens(self, tokens):
         ventana_tokens = tk.Toplevel(self.ventana)
@@ -105,19 +129,21 @@ class Interfaz:
             messagebox.showinfo("Aviso", "No hay texto para analizar.")
             return
 
+        # Limpiar tabla de símbolos antes del análisis
+        self.tabla_simbolos.memoria = []
+        self.tabla_simbolos.overflow = []
+
         tokens, errores_lex = self.analizador.tokenize(texto)
 
-        # Analizador sintáctico
-        parser = Parser(tokens, self.tabla_simbolos)
-        ast = parser.parse()
-        errores_parser = parser.errores
+        # Usar el analizador sintáctico que ya incluye el parser
         errores_sint = self.analizador_sintactico.analizar(tokens)
-        # Combinar errores sintácticos del parser y del analizador
-        errores_sint_total = errores_parser + errores_sint
 
         # Mostrar ventanas automáticamente
-        self.mostrar_resultados_errores(errores_lex, errores_sint_total)
+        self.mostrar_resultados_errores(errores_lex, errores_sint)
         self.mostrar_tabla_tokens(tokens)
+
+        # También mostrar tabla de símbolos actualizada
+        self.mostrar_tabla()
 
     def mostrar_tabla(self):
         if not self.tabla_simbolos:
