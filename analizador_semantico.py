@@ -60,11 +60,17 @@ class AnalizadorSemantico:
         tipo_declarado = nodo['tipo']
         valor = nodo.get('valor')
         
+        # Si el valor es una llamada a función, validar la llamada
+        if valor and isinstance(valor, dict) and valor.get('nodo') == 'LLAMADA_FUNCION':
+            # Validar la llamada a función
+            self._visitar_llamada_funcion(valor)
         # Verificar inicialización
         if valor:
             tipo_valor = self.verificador_tipos.obtener_tipo_expresion(valor)
             if not self.verificador_tipos.verificar_asignacion(tipo_declarado, tipo_valor, nodo.get('linea', 0)):
                 self.errores.append(f"Línea {nodo.get('linea')}: Tipo incompatible en inicialización de '{nombre}'")
+                
+                
     
     def _visitar_asignacion(self, nodo):
         """Valida una asignación"""

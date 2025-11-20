@@ -891,7 +891,7 @@ class Parser:
         # Entrar al ámbito de la función
         self.tabla_simbolos.entrar_ambito(f"funcion:{nombre}")
 
-        # 🔥 CORRECCIÓN: Insertar parámetros SOLO si no existen
+        # CORRECCIÓN: Insertar parámetros SOLO si no existen
         for tipo_param, nombre_param in parametros:
             param_existente = self.tabla_simbolos.buscar_en_ambito_actual(nombre_param)
             if not param_existente:
@@ -919,7 +919,7 @@ class Parser:
         # Salir del ámbito
         self.tabla_simbolos.salir_ambito()
 
-        # 🔥 CORRECCIÓN: ELIMINAR la segunda inserción de función que estaba aquí
+        # CORRECCIÓN: ELIMINAR la segunda inserción de función que estaba aquí
         return {
             "nodo": "FUNCION", 
             "nombre": nombre, 
@@ -928,6 +928,7 @@ class Parser:
             "cuerpo": bloque_func,
             "linea": linea
         }
+        
     def parametros(self):
         params = []
         if self.actual()["tipo"] in ("TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_BOOLEANO", "TIPO_CARACTER", "TIPO_CADENA"):

@@ -15,7 +15,7 @@ class ValidadorFunciones:
         if not nombre:
             return False
         
-        # 🔥 CORRECCIÓN: Solo verificar si existe, no insertar
+        #  CORRECCIÓN: Solo verificar si existe, no insertar
         simbolo_existente = self.tabla_simbolos.buscar(nombre)
         if simbolo_existente and simbolo_existente.get('categoria') == 'funcion':
             # La función ya existe, eso está bien - no es un error
@@ -32,7 +32,7 @@ class ValidadorFunciones:
                 return False
             nombres_parametros.add(nombre_param)
         
-        # 🔥 CORRECCIÓN: NO insertar la función aquí - ya fue insertada por el parser
+        #  CORRECCIÓN: NO insertar la función aquí - ya fue insertada por el parser
         return True
 
     
@@ -45,6 +45,7 @@ class ValidadorFunciones:
         # Buscar la función
         simbolo_funcion = self.tabla_simbolos.buscar(nombre_funcion)
         if not simbolo_funcion or simbolo_funcion.get('categoria') != 'funcion':
+            print("ENTREEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE")
             self.errores.append(f"Línea {linea}: Función '{nombre_funcion}' no declarada")
             return False
         

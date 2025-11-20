@@ -12,6 +12,6 @@ flotante calcularPromedio(entero suma, entero total) {
     }
     retornar suma / total;
 }
-promedio = calcularPromedio(20, 2);
+flotante promedio = calcularPromedio(20, 2);
 
-imprimir(promedio)
+imprimir(promedio);

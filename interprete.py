@@ -30,11 +30,19 @@ class Interprete:
                         self.memoria[identificador] = valor
                         print(f"DEBUG: Inicializada variable global '{identificador}' = {valor}")
 
+
+
     def ejecutar_programa(self, ast):
+        for nodo in ast:
+            if isinstance(nodo, dict) and nodo.get("nodo") == "FUNCION":
+                nombre = nodo["nombre"]
+                self.funciones[nombre] = nodo
+                print(f"DEBUG: Pre-registrada función '{nombre}'")
         resultado = None
         for nodo in ast:
             resultado = self.ejecutar(nodo)
         return resultado
+
 
     def ejecutar(self, nodo):
         if nodo is None:
@@ -364,33 +372,42 @@ class Interprete:
         print(f"DEBUG: Nodo no manejado en intérprete: {tipo}")
         return None
 
-    def llamar_funcion(self, nombre, args_nodos):
+    def llamar_funcion(self, nombre, args, linea=None):
+        print(f"🔥 DEBUG_LLAMADA_FUNCION: Buscando función '{nombre}'")
+        print(f"🔥 DEBUG_LLAMADA_FUNCION: Funciones disponibles: {list(self.funciones.keys())}")
+        
         if nombre not in self.funciones:
-            raise RuntimeErrorInterp(f"Función no declarada: {nombre}")
+            raise RuntimeErrorInterp(f"Función '{nombre}' no definida (línea {linea})")
 
         funcion = self.funciones[nombre]
+        print(f"🔥 DEBUG_LLAMADA_FUNCION: Función '{nombre}' encontrada, parámetros: {funcion.get('params', [])}")
 
-        # Creamos un nuevo entorno local
         entorno_anterior = self.memoria
         self.memoria = self.memoria.copy()
 
-        # Pasar parámetros
         parametros = funcion.get("params", [])
-        args = [self.ejecutar(a) for a in args_nodos]
+        print(f"DEBUG_LLAMADA_FUNCION: Parámetros esperados: {parametros}")
+        print(f"DEBUG_LLAMADA_FUNCION: Argumentos recibidos: {args}")
 
-        for (tipo, id_param), valor in zip(parametros, args):
-            self.memoria[id_param] = valor
+        # Asignar argumentos a parámetros
+        for (tipo_param, nombre_param), valor_arg in zip(parametros, args):
+            self.memoria[nombre_param] = valor_arg
+            print(f"DEBUG_LLAMADA_FUNCION: Asignado {nombre_param} = {valor_arg}")
 
         try:
-            self.ejecutar(funcion["cuerpo"])
+            resultado = self.ejecutar(funcion["cuerpo"])
+            print(f"DEBUG_LLAMADA_FUNCION: Función '{nombre}' ejecutada, resultado: {resultado}")
         except ReturnSignal as r:
             resultado = r.valor
-        else:
-            resultado = None
+            print(f"DEBUG_LLAMADA_FUNCION: Función '{nombre}' retornó: {resultado}")
+        except Exception as e:
+            print(f"DEBUG_LLAMADA_FUNCION: Error en función '{nombre}': {e}")
+            raise
+        finally:
+            self.memoria = entorno_anterior
 
-        # Restaurar entorno
-        self.memoria = entorno_anterior
         return resultado
+
 
     def crear_objeto(self, nombre_clase, args):
         if nombre_clase not in self.clases:

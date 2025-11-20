@@ -69,6 +69,19 @@ class AnalizadorSintactico:
 
         interp = Interprete(output=output_callback, tabla_simbolos=self.tabla_simbolos)
 
+        # CORRECCIÓN: REGISTRAR FUNCIONES PRIMERO
+        print("DEBUG: Registrando funciones en el intérprete...")
+        funciones_registradas = 0
+        for nodo in ast:
+            if isinstance(nodo, dict) and nodo.get("nodo") == "FUNCION":
+                nombre = nodo["nombre"]
+                interp.funciones[nombre] = nodo
+                funciones_registradas += 1
+                print(f"DEBUG: Función '{nombre}' registrada en intérprete")
+        
+        print(f" DEBUG: Total funciones registradas: {funciones_registradas}")
+        print(f" DEBUG: Funciones disponibles: {list(interp.funciones.keys())}")
+
         try:
             # Ejecutar solo sentencias globales
             for nodo in ast:
