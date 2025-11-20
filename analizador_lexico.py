@@ -40,6 +40,7 @@ class AnalizadorLexico:
             "imprimir": "IMPRIMIR",
             "verdadero": "BOOLEANO_LIT",
             "falso": "BOOLEANO_LIT",
+            "verdadero": "BOOLEANO_LIT",
             "vacio": "TIPO_VACIO"
         }
 

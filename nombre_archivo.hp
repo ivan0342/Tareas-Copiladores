@@ -65,3 +65,7 @@ intentar {
 } capturar (error) {
     mensaje = "Error al calcular promedio";
 }
+
+
+
+

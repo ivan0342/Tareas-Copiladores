@@ -1,0 +1,17 @@
+entero x = 10;
+flotante y = 5.5;
+booleano z = verdadero;
+cadena texto = "hola";
+entero suma = x + 15;
+imprimir(suma);
+
+
+flotante calcularPromedio(entero suma, entero total) {
+    si (total == 0) {
+        retornar 0.0;
+    }
+    retornar suma / total;
+}
+promedio = calcularPromedio(20, 2);
+
+imprimir(promedio)

@@ -1,6 +1,7 @@
 # analizador_sintactico.py
 from parser import Parser, ParserError
 from interprete import Interprete, RuntimeErrorInterp
+from analizador_semantico import AnalizadorSemantico
 
 
 class AnalizadorSintactico:
@@ -30,14 +31,28 @@ class AnalizadorSintactico:
 
         print(f"DEBUG: AST generado con {len(ast)} nodos")
 
-        # 2) Poblar la tabla de símbolos (VERSIÓN SIMPLIFICADA)
+        # 2) Poblar la tabla de símbolos (VERSIÓN SIMPLIFICADA) - PRIMERO
         try:
-            self._actualizar_tabla_desde_ast_simple(ast)  # Usa la nueva versión simplificada
+            self._actualizar_tabla_desde_ast_simple(ast)
             print("DEBUG: Tabla de símbolos actualizada desde AST")
         except Exception as e:
             errores.append(f"Error al actualizar tabla de símbolos: {e}")
 
-        # 3) Mostrar contenido de la tabla para debug
+        # 3) Análisis Semántico - DESPUÉS de tener la tabla poblada
+        try:
+            analizador_semantico = AnalizadorSemantico(self.tabla_simbolos)
+            errores_semanticos = analizador_semantico.analizar(ast)
+        
+            if errores_semanticos:
+                print("DEBUG: Se encontraron errores semánticos:")
+                for error_sem in errores_semanticos:
+                    print(f"  - {error_sem}")
+                    errores.append(f"SEMÁNTICO: {error_sem}")
+        except Exception as e:
+            print(f"DEBUG: Error durante análisis semántico: {e}")
+            errores.append(f"Error en análisis semántico: {e}")
+
+        # 4) Mostrar contenido de la tabla para debug
         print("DEBUG: Contenido de la tabla de símbolos:")
         simbolos = self.tabla_simbolos.obtener_todos()
         for i, simbolo in enumerate(simbolos):
@@ -46,7 +61,7 @@ class AnalizadorSintactico:
         if not simbolos:
             print("  (vacía)")
 
-        # 4) Ejecutar AST con intérprete
+        # 5) Ejecutar AST con intérprete
         salida_lines = []
 
         def output_callback(valor):
@@ -73,10 +88,6 @@ class AnalizadorSintactico:
         return errores
 
     def _actualizar_tabla_desde_ast_simple(self, ast):
-        """
-        Versión SIMPLIFICADA que solo procesa declaraciones globales directas
-        para evitar la recursión infinita
-        """
         for nodo in ast:
             if not isinstance(nodo, dict):
                 continue
@@ -144,8 +155,4 @@ class AnalizadorSintactico:
         # Si es un valor primitivo directamente
         return nodo_val
 
-    # ELIMINA todos estos métodos viejos que causaban recursión:
-    # _actualizar_tabla_desde_ast (viejo)
-    # _procesar_nodo_para_tabla (viejo)
-    # _recorrer_y_procesar (viejo)
-    # _valor_literal_de_nodo (viejo)
+   

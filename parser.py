@@ -1,3 +1,4 @@
+#parser.py
 from tabla_simbolos import TablaSimbolos
 
 class ParserError(Exception):
@@ -679,7 +680,11 @@ class Parser:
 
         if tok["tipo"] == "BOOLEANO_LIT":
             self.match("BOOLEANO_LIT")
-            return {"nodo": "LIT_BOOL", "valor": tok["token"] == "true"}
+            # Aceptar 'verdadero'/'falso' (español) y 'true'/'false' (si alguna vez aparecen)
+            valor_lower = tok["token"].lower()
+            valor_bool = valor_lower in ("verdadero", "true")
+            return {"nodo": "LIT_BOOL", "valor": valor_bool}
+
 
         # Identificador o llamada a función
         if tok["tipo"] == "IDENTIFICADOR":
@@ -825,64 +830,104 @@ class Parser:
     # -------------------------------------------------------
 
     def declaracion_funcion(self):
-        tipo = self.match(self.actual()["tipo"])["token"]  # tipo retorno
-        nombre = self.match("IDENTIFICADOR")["token"]
+        tipo_token = self.match(self.actual()["tipo"])
+        tipo = tipo_token["token"] if tipo_token else "TIPO_VACIO"
+        linea = tipo_token["linea"] if tipo_token else self.actual()["linea"]
+        
+        nombre_token = self.match("IDENTIFICADOR")
+        if not nombre_token:
+            self.error("Se esperaba nombre de función")
+            return None
+        nombre = nombre_token["token"]
 
         self.match("PAREN_IZQ")
         parametros = []
 
         if self.actual()["tipo"] != "PAREN_DER":
             while True:
-                tipo_param = self.match(self.actual()["tipo"])["token"]
-                id_token = self.match("IDENTIFICADOR")
-                if id_token is None:
-                    self.error("Se esperaba un identificador en los parámetros de la función")
-                    return None
-                id_param = id_token["token"]
-
-                parametros.append((tipo_param, id_param))
+                tipo_param_token = self.match_multiple("TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_BOOLEANO", "TIPO_CARACTER", "TIPO_CADENA")
+                if not tipo_param_token:
+                    self.error("Tipo de parámetro inválido")
+                    break
+                    
+                tipo_param = tipo_param_token["token"]
+                nombre_param_token = self.match("IDENTIFICADOR")
+                if not nombre_param_token:
+                    self.error("Se esperaba nombre de parámetro")
+                    break
+                    
+                nombre_param = nombre_param_token["token"]
+                parametros.append((tipo_param, nombre_param))
+                
                 if self.actual()["tipo"] != "COMA":
                     break
                 self.match("COMA")
 
         self.match("PAREN_DER")
 
-        # ✅ Soporte para funciones sin cuerpo (p. ej. dentro de interfaces)
-        if self.check("PUNTO_Y_COMA"):
-            self.match("PUNTO_Y_COMA")
-            return {"nodo": "DECLARACION_FUNCION_INTERFAZ", "nombre": nombre, "params": parametros, "cuerpo": None}
+        # 🔥 CORRECCIÓN: Insertar función SOLO UNA VEZ
+        # Verificar si ya existe antes de insertar
+        funcion_existente = self.tabla_simbolos.buscar(nombre)
+        if not funcion_existente:
+            simbolo_funcion = {
+                "identificador": nombre,
+                "categoria": "funcion",
+                "tipo_dato": tipo,
+                "parametros": parametros,
+                "linea": linea,
+                "ambito": "Global",
+                "direccion": self.tabla_simbolos.obtener_direccion(),
+                "valor": None,
+                "estado": "declarada",
+                "estructura": "Funcion",
+                "contador_referencias": 0
+            }
+            try:
+                self.tabla_simbolos.insertar(simbolo_funcion)
+                print(f"DEBUG: Insertada función '{nombre}' en tabla de símbolos")
+            except Exception as e:
+                print(f"Error al insertar función {nombre}: {e}")
 
-        # Entrar ámbito función normal
-        self.tabla_simbolos.entrar_ambito(f"func:{nombre}")
+        # Entrar al ámbito de la función
+        self.tabla_simbolos.entrar_ambito(f"funcion:{nombre}")
 
-        for tipo_param, id_param in parametros:
-            self.tabla_simbolos.insertar({
-                "identificador": id_param,
-                "categoria": "parámetro",
-                "tipo_dato": tipo_param,
-                "estado": "inicializado",
-                "ambito": self.tabla_simbolos.ambito_actual(),
-                "valor": None
-            })
+        # 🔥 CORRECCIÓN: Insertar parámetros SOLO si no existen
+        for tipo_param, nombre_param in parametros:
+            param_existente = self.tabla_simbolos.buscar_en_ambito_actual(nombre_param)
+            if not param_existente:
+                simbolo_param = {
+                    "identificador": nombre_param,
+                    "categoria": "parametro",
+                    "tipo_dato": tipo_param,
+                    "linea": linea,
+                    "ambito": self.tabla_simbolos.ambito_actual(),
+                    "direccion": self.tabla_simbolos.obtener_direccion(),
+                    "valor": None,
+                    "estado": "declarado",
+                    "estructura": None,
+                    "contador_referencias": 0
+                }
+                try:
+                    self.tabla_simbolos.insertar(simbolo_param)
+                    print(f"DEBUG: Insertado parámetro '{nombre_param}' en ámbito de función")
+                except Exception as e:
+                    print(f"Error al insertar parámetro {nombre_param}: {e}")
 
+        # Parsear cuerpo de la función
         bloque_func = self.bloque()
 
+        # Salir del ámbito
         self.tabla_simbolos.salir_ambito()
 
-        simbolo = {
-            "identificador": nombre,
-            "categoria": "función",
-            "tipo_dato": tipo,
-            "valor": parametros,
-            "estado": "definida",
-            "ambito": "Global",
-            "estructura": "Función"
+        # 🔥 CORRECCIÓN: ELIMINAR la segunda inserción de función que estaba aquí
+        return {
+            "nodo": "FUNCION", 
+            "nombre": nombre, 
+            "tipo": tipo, 
+            "params": parametros, 
+            "cuerpo": bloque_func,
+            "linea": linea
         }
-        self.tabla_simbolos.insertar(simbolo)
-
-        return {"nodo": "FUNCION", "nombre": nombre, "params": parametros, "cuerpo": bloque_func}
-
-
     def parametros(self):
         params = []
         if self.actual()["tipo"] in ("TIPO_ENTERO", "TIPO_FLOTANTE", "TIPO_BOOLEANO", "TIPO_CARACTER", "TIPO_CADENA"):

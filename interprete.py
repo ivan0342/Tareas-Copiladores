@@ -41,7 +41,28 @@ class Interprete:
             return None
 
         tipo = nodo.get("nodo")
-
+        if tipo == "LLAMADA_FUNCION":
+            nombre_funcion = nodo["id"]
+            args_nodos = nodo.get("args", [])
+            linea = nodo.get("linea", 0)
+            
+            print(f"DEBUG: Llamando función '{nombre_funcion}' con {len(args_nodos)} argumentos")
+            
+            # Verificar que la función existe
+            if nombre_funcion not in self.funciones:
+                raise RuntimeErrorInterp(f"Función '{nombre_funcion}' no definida (línea {linea})")
+            
+            # Evaluar argumentos
+            args_evaluados = []
+            for arg in args_nodos:
+                args_evaluados.append(self.ejecutar(arg))
+            
+            print(f"DEBUG: Argumentos evaluados: {args_evaluados}")
+            
+            # Llamar a la función
+            resultado = self.llamar_funcion(nombre_funcion, args_evaluados, linea)
+            print(f"DEBUG: Función '{nombre_funcion}' retornó: {resultado}")
+            return resultado
         # -------------------------
         # DECLARACIONES Y ASIGNACIÓN
         # -------------------------
@@ -186,18 +207,124 @@ class Interprete:
             # Si no está en ninguno, error
             raise RuntimeErrorInterp(f"Símbolo '{name}' no encontrado en la tabla.")
 
-        # ... (el resto del código se mantiene igual)
+        # -------------------------
+        # OPERACIONES BINARIAS
+        # -------------------------
+        if tipo == "BIN_OP":
+            op = nodo.get("op")
+            # Ejecutar subexpresiones
+            izq_val = self.ejecutar(nodo.get("izq")) if nodo.get("izq") is not None else None
+            der_val = self.ejecutar(nodo.get("der")) if nodo.get("der") is not None else None
 
+            print(f"DEBUG: Evaluando BIN_OP {op} con izq={izq_val} der={der_val}")
+
+            # Operadores aritméticos (los tokens del parser son MAS, MENOS, MULT, DIV, MOD)
+            if op in ("MAS", "+"):
+                # Si alguna es string, concatenar
+                if isinstance(izq_val, str) or isinstance(der_val, str):
+                    return str(izq_val) + str(der_val)
+                # Sumar con coerción int/float
+                if isinstance(izq_val, float) or isinstance(der_val, float):
+                    return (izq_val or 0) + (der_val or 0)
+                return (izq_val or 0) + (der_val or 0)
+
+            if op in ("MENOS", "-"):
+                return (izq_val or 0) - (der_val or 0)
+
+            if op in ("MULT", "*"):
+                return (izq_val or 0) * (der_val or 0)
+
+            if op in ("DIV", "/"):
+                try:
+                    return (izq_val or 0) / (der_val or 0)
+                except ZeroDivisionError:
+                    raise RuntimeErrorInterp(f"División por cero en expresión (línea {nodo.get('linea')})")
+
+            if op in ("MOD", "%"):
+                try:
+                    return (izq_val or 0) % (der_val or 0)
+                except Exception:
+                    raise RuntimeErrorInterp(f"Error en módulo en expresión (línea {nodo.get('linea')})")
+
+            # Comparaciones
+            if op in ("IGUAL", "=="):
+                return izq_val == der_val
+            if op in ("DISTINTO", "!="):
+                return izq_val != der_val
+            if op in ("MENOR", "<"):
+                return izq_val < der_val
+            if op in ("MAYOR", ">"):
+                return izq_val > der_val
+            if op in ("MENOR_IGUAL", "<="):
+                return izq_val <= der_val
+            if op in ("MAYOR_IGUAL", ">="):
+                return izq_val >= der_val
+
+            # Lógicos
+            if op in ("AND", "&&"):
+                return bool(izq_val) and bool(der_val)
+            if op in ("OR", "||"):
+                return bool(izq_val) or bool(der_val)
+
+            # Si no conocemos el operador, devolver None
+            return None
+
+        # -------------------------
+        # UNARIOS (p. ej. i++ / i--)
+        # -------------------------
+        if tipo == "UNARIO":
+            # 'id' puede ser un token dict o un string
+            id_field = nodo.get("id")
+            if isinstance(id_field, dict):
+                nombre = id_field.get("token")
+            else:
+                nombre = id_field
+
+            op_token = nodo.get("op")
+            op_tipo = op_token.get("tipo") if isinstance(op_token, dict) else (op_token or "")
+
+            # Obtener valor actual
+            valor_actual = self.memoria.get(nombre, None)
+            if valor_actual is None:
+                # intentar recuperar desde tabla de símbolos
+                if self.tabla_simbolos:
+                    simbolo = self.tabla_simbolos.buscar(nombre)
+                    if simbolo:
+                        valor_actual = simbolo.get("valor")
+            if valor_actual is None:
+                raise RuntimeErrorInterp(f"Variable '{nombre}' no inicializada para operador unario.")
+
+            if op_tipo in ("INCREMENTO", "++"):
+                nuevo = valor_actual + 1
+                self.memoria[nombre] = nuevo
+                if self.tabla_simbolos:
+                    self.tabla_simbolos.actualizar(nombre, nuevo)
+                return nuevo
+
+            if op_tipo in ("DECREMENTO", "--"):
+                nuevo = valor_actual - 1
+                self.memoria[nombre] = nuevo
+                if self.tabla_simbolos:
+                    self.tabla_simbolos.actualizar(nombre, nuevo)
+                return nuevo
+
+            return None
+
+        # -------------------------
+        # CREACIÓN/DEF FUNCIONES/CLASES/LLAMADAS
+        # -------------------------
         if tipo == "NUEVO":
-            return self.crear_objeto(nodo["clase"], nodo["args"])
+            return self.crear_objeto(nodo["clase"], nodo.get("args", []))
 
         if tipo == "FUNCION":
             nombre = nodo["nombre"]
             self.funciones[nombre] = nodo
+            print(f"DEBUG: Registrada función '{nombre}' en intérprete")
             return None
 
+
         if tipo == "RETORNAR":
-            valor = self.ejecutar(nodo["valor"])
+            valor = self.ejecutar(nodo["valor"]) if nodo.get("valor") is not None else None
             raise ReturnSignal(valor)
 
         if tipo == "CLASE":
@@ -206,22 +333,36 @@ class Interprete:
             return None
 
         if tipo == "LLAMADA_METODO":
-            obj = self.memoria[nodo["obj"]]
-            clase = self.clases[obj["__clase__"]]
-            metodo = clase["metodos"][nodo["metodo"]]
-            args = [obj] + [self.ejecutar(a) for a in nodo["args"]]
+            obj = self.memoria.get(nodo["obj"])
+            if obj is None:
+                raise RuntimeErrorInterp(f"Objeto '{nodo['obj']}' no encontrado.")
+            clase = self.clases.get(obj.get("__clase__"))
+            metodo = None
+            if clase:
+                # buscar método por nombre
+                for m in clase.get("metodos", []):
+                    if m.get("nombre") == nodo["metodo"]:
+                        metodo = m
+                        break
+            if metodo is None:
+                raise RuntimeErrorInterp(f"Método '{nodo['metodo']}' no encontrado en clase {obj.get('__clase__')}.")
+            args = [obj] + [self.ejecutar(a) for a in nodo.get("args", [])]
             return self.llamar_funcion(metodo["nombre"], args)
-        
-        if tipo == "MANEJO_ERRORES":
+
+        if tipo == "MANEJO_ERRORES" or tipo == "INTENTAR":
             try:
-                self.ejecutar(nodo["intento"])
+                self.ejecutar(nodo.get("try") or nodo.get("intento"))
             except RuntimeErrorInterp as e:
-                # Crear variable del error en memoria
-                error_var = nodo["error"]["token"] if isinstance(nodo["error"], dict) else nodo["error"]
+                error_var = nodo.get("error") if nodo.get("error") else nodo.get("error_var")
+                if isinstance(error_var, dict):
+                    error_var = error_var.get("token")
                 self.memoria[error_var] = str(e)
-                self.ejecutar(nodo["captura"])
+                self.ejecutar(nodo.get("catch") or nodo.get("captura"))
             return None
 
+        # Si no se reconoce el nodo:
+        print(f"DEBUG: Nodo no manejado en intérprete: {tipo}")
+        return None
 
     def llamar_funcion(self, nombre, args_nodos):
         if nombre not in self.funciones:
@@ -234,7 +375,7 @@ class Interprete:
         self.memoria = self.memoria.copy()
 
         # Pasar parámetros
-        parametros = funcion["params"]
+        parametros = funcion.get("params", [])
         args = [self.ejecutar(a) for a in args_nodos]
 
         for (tipo, id_param), valor in zip(parametros, args):
@@ -261,8 +402,8 @@ class Interprete:
         obj = {"__clase__": nombre_clase}
 
         # Inicializar atributos
-        for attr in clase["atributos"]:
-            obj[attr["id"]] = None
+        for attr in clase.get("atributos", []):
+            obj[attr.get("id")] = None
 
         # Llamar constructor si existe
         if nombre_clase in self.funciones:
