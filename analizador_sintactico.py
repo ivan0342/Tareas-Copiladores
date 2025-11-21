@@ -1,4 +1,4 @@
-# analizador_sintactico.py
+# archivo: analizador_sintactico.py
 from parser import Parser, ParserError
 from interprete import Interprete, RuntimeErrorInterp
 from analizador_semantico import AnalizadorSemantico
@@ -14,6 +14,8 @@ class AnalizadorSintactico:
             print(t)
 
         errores = []
+
+        print(f"DEBUG: ID de tabla_simbolos en sintactico: {id(self.tabla_simbolos)}")
 
         # Asegurar EOF al final
         if not tokens or tokens[-1].get("tipo") != "EOF":
@@ -38,11 +40,12 @@ class AnalizadorSintactico:
         except Exception as e:
             errores.append(f"Error al actualizar tabla de símbolos: {e}")
 
-        # 3) Análisis Semántico - DESPUÉS de tener la tabla poblada
+        # 3) Análisis Semántico - DESACTIVADO TEMPORALMENTE
+
         try:
             analizador_semantico = AnalizadorSemantico(self.tabla_simbolos)
             errores_semanticos = analizador_semantico.analizar(ast)
-        
+
             if errores_semanticos:
                 print("DEBUG: Se encontraron errores semánticos:")
                 for error_sem in errores_semanticos:
@@ -50,7 +53,8 @@ class AnalizadorSintactico:
                     errores.append(f"SEMÁNTICO: {error_sem}")
         except Exception as e:
             print(f"DEBUG: Error durante análisis semántico: {e}")
-            errores.append(f"Error en análisis semántico: {e}")
+            # errores.append(f"Error en análisis semántico: {e}")  # Comentado temporalmente
+
 
         # 4) Mostrar contenido de la tabla para debug
         print("DEBUG: Contenido de la tabla de símbolos:")
@@ -78,7 +82,7 @@ class AnalizadorSintactico:
                 interp.funciones[nombre] = nodo
                 funciones_registradas += 1
                 print(f"DEBUG: Función '{nombre}' registrada en intérprete")
-        
+
         print(f" DEBUG: Total funciones registradas: {funciones_registradas}")
         print(f" DEBUG: Funciones disponibles: {list(interp.funciones.keys())}")
 
@@ -107,6 +111,7 @@ class AnalizadorSintactico:
 
             tipo_n = nodo.get("nodo")
 
+            """
             # Solo procesar declaraciones de variables globales
             if tipo_n == "DECL_VAR":
                 ident = nodo.get("id")
@@ -147,6 +152,7 @@ class AnalizadorSintactico:
                     }
                     self.tabla_simbolos.insertar(simbolo)
                     print(f"DEBUG: Insertada variable por asignación: {ident}")
+        """
 
     def _valor_literal_de_nodo_simple(self, nodo_val):
         """
@@ -167,5 +173,3 @@ class AnalizadorSintactico:
 
         # Si es un valor primitivo directamente
         return nodo_val
-
-   

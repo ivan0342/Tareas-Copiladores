@@ -174,6 +174,7 @@ class Interprete:
         if tipo in ["LIT_INT", "LIT_FLOAT", "LIT_STR", "LIT_BOOL", "LIT_CHAR"]:
             return nodo["valor"]
 
+        # En el método ejecutar(), caso "VAR":
         if tipo == "VAR":
             name = nodo["id"]
             print(f"DEBUG: Buscando variable '{name}'")
@@ -184,13 +185,35 @@ class Interprete:
                 print(f"DEBUG: Encontrada en memoria local: {valor}")
                 return valor
 
-            # Buscar en la tabla de símbolos global
+            # ✅ BUSCAR EN TABLA EXTENDIDA PRIMERO
             if self.tabla_simbolos:
+                # Buscar en variables extendidas
+                variable_ext = None
+
+                # Buscar en variables normales
+                if hasattr(self.tabla_simbolos,
+                           'variables_extendidas') and name in self.tabla_simbolos.variables_extendidas:
+                    variable_ext = self.tabla_simbolos.variables_extendidas[name]
+
+                # Buscar en constantes
+                elif hasattr(self.tabla_simbolos,
+                             'constantes_extendidas') and name in self.tabla_simbolos.constantes_extendidas:
+                    variable_ext = self.tabla_simbolos.constantes_extendidas[name]
+
+                if variable_ext:
+                    valor = variable_ext.valor
+                    print(f"DEBUG: Encontrada en tabla extendida: {valor}")
+
+                    # También almacenar en memoria local para acceso futuro
+                    self.memoria[name] = valor
+                    return valor
+
+                # Fallback: Buscar en la estructura antigua
                 simbolo = self.tabla_simbolos.buscar(name)
                 if simbolo:
                     # Usar cualquier campo que pueda contener el valor
                     valor = simbolo.get("valor") or simbolo.get("Valor")
-                    print(f"DEBUG: Encontrada en tabla de símbolos: {valor}")
+                    print(f"DEBUG: Encontrada en tabla antigua: {valor}")
 
                     if valor is not None:
                         # También almacenar en memoria local para acceso futuro

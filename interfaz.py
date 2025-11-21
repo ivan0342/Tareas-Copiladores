@@ -1,3 +1,4 @@
+# archivo: interfaz.py
 import tkinter as tk
 from tkinter import ttk, messagebox
 from analizador_lexico import AnalizadorLexico
@@ -5,11 +6,12 @@ from tabla_simbolos import TablaSimbolos
 from analizador_sintactico import AnalizadorSintactico
 from parser import Parser, ParserError
 
+
 class Interfaz:
     def __init__(self):
         self.ventana = tk.Tk()
         self.ventana.title("Analizador Léxico")
-        self.ventana.geometry("800x700")
+        self.ventana.geometry("1000x700")  # Un poco más ancha para los nuevos campos
 
         # Tabla de símbolos con desbordamiento
         self.tabla_simbolos = TablaSimbolos(capacidad_bytes=100, archivo_backup="tabla_overflow.json")
@@ -17,7 +19,7 @@ class Interfaz:
         # Analizador léxico con tabla de símbolos
         self.analizador = AnalizadorLexico(tabla_simbolos=self.tabla_simbolos)
         self.analizador_sintactico = AnalizadorSintactico(tabla_simbolos=self.tabla_simbolos)
-        
+
         self.crear_interfaz()
 
     def crear_interfaz(self):
@@ -29,7 +31,7 @@ class Interfaz:
 
         boton_analizar = ttk.Button(self.ventana, text="Compilar", command=self.analizar_texto)
         boton_analizar.pack(pady=10)
-        
+
         boton_tabla = ttk.Button(self.ventana, text="Ver tabla de símbolos", command=self.mostrar_tabla)
         boton_tabla.pack(pady=10)
 
@@ -151,42 +153,226 @@ class Interfaz:
             return
 
         ventana_tabla = tk.Toplevel(self.ventana)
-        ventana_tabla.title("Tabla de Símbolos")
-        ventana_tabla.geometry("700x500")
+        ventana_tabla.title("Tabla de Símbolos - Información Extendida")
+        ventana_tabla.geometry("1200x600")  # Más ancha para los nuevos campos
 
-        tabla = ttk.Treeview(ventana_tabla, columns=(
+        # Crear notebook para diferentes vistas
+        notebook = ttk.Notebook(ventana_tabla)
+        notebook.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Pestaña 1: Vista Completa
+        frame_completo = ttk.Frame(notebook)
+        notebook.add(frame_completo, text="Vista Completa")
+
+        # Tabla con TODOS los campos (antiguos + nuevos)
+        tabla = ttk.Treeview(frame_completo, columns=(
             "Identificador", "Categoria", "Tipo_dato", "Linea", "Ambito",
-            "Direccion", "Valor", "Estado", "Estructura", "Contador"
-        ), show="headings")
+            "Direccion", "Valor", "Estado", "Estructura", "Contador",
+            # NUEVOS CAMPOS:
+            "Tamaño_bytes", "Es_constante", "Modificable", "Referencias", "Vivo"
+        ), show="headings", height=20)
 
-        for col in tabla["columns"]:
+        # Configurar columnas
+        columnas = [
+            ("Identificador", 100),
+            ("Categoria", 80),
+            ("Tipo_dato", 90),
+            ("Linea", 50),
+            ("Ambito", 80),
+            ("Direccion", 80),
+            ("Valor", 120),
+            ("Estado", 80),
+            ("Estructura", 80),
+            ("Contador", 70),
+            # NUEVOS CAMPOS:
+            ("Tamaño_bytes", 70),
+            ("Es_constante", 80),
+            ("Modificable", 80),
+            ("Referencias", 80),
+            ("Vivo", 50)
+        ]
+
+        for col, width in columnas:
             tabla.heading(col, text=col)
-        tabla.column("Identificador", width=120)
-        tabla.column("Categoria", width=100)
-        tabla.column("Tipo_dato", width=100)
-        tabla.column("Linea", width=50)
-        tabla.column("Ambito", width=100)
-        tabla.column("Direccion", width=80)
-        tabla.column("Valor", width=150)
-        tabla.column("Estado", width=100)
-        tabla.column("Estructura", width=100)
-        tabla.column("Contador", width=80)
+            tabla.column(col, width=width)
 
-        tabla.pack(fill="both", expand=True)
+        # Scrollbar
+        scroll = ttk.Scrollbar(frame_completo, orient="vertical", command=tabla.yview)
+        tabla.configure(yscrollcommand=scroll.set)
 
-        for s in self.tabla_simbolos.obtener_todos():
+        tabla.pack(side="left", fill="both", expand=True)
+        scroll.pack(side="right", fill="y")
+
+        # Poblar tabla con datos de la estructura extendida
+        self._poblar_tabla_extendida(tabla)
+
+        # Pestaña 2: Estadísticas
+        frame_stats = ttk.Frame(notebook)
+        notebook.add(frame_stats, text="Estadísticas")
+
+        # Área de texto para estadísticas
+        texto_stats = tk.Text(frame_stats, wrap=tk.WORD, font=("Consolas", 10), height=15)
+        texto_stats.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Generar estadísticas
+        stats = self._generar_estadisticas()
+        texto_stats.insert(tk.END, stats)
+        texto_stats.config(state="disabled")
+
+        # Pestaña 3: Análisis Optimización
+        frame_opt = ttk.Frame(notebook)
+        notebook.add(frame_opt, text="Análisis Optimización")
+
+        # Área de texto para análisis
+        texto_opt = tk.Text(frame_opt, wrap=tk.WORD, font=("Consolas", 10), height=15)
+        texto_opt.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Generar análisis de optimización
+        analisis = self._generar_analisis_optimizacion()
+        texto_opt.insert(tk.END, analisis)
+        texto_opt.config(state="disabled")
+
+    def _poblar_tabla_extendida(self, tabla):
+        """Pobla la tabla con datos de la estructura extendida"""
+        # ✅ USAR SOLO LA ESTRUCTURA EXTENDIDA
+
+        # Variables normales
+        for nombre, variable in self.tabla_simbolos.variables_extendidas.items():
             tabla.insert("", tk.END, values=(
-                s.get("identificador", ""),
-                s.get("categoria", ""),
-                s.get("tipo_dato", ""),
-                s.get("linea", ""),
-                s.get("ambito", ""),
-                s.get("direccion", ""),
-                s.get("valor", ""),
-                s.get("estado", ""),
-                s.get("estructura", ""),
-                s.get("contador_referencias", 0)
+                nombre,
+                "variable",
+                variable.tipo_dato,
+                variable.linea_declaracion,
+                variable.ambito,
+                variable.direccion_relativa or "N/A",
+                variable.valor,
+                variable.estado,
+                "-",
+                variable.contador_referencias,
+                # NUEVOS CAMPOS:
+                variable.tamanio_bytes,
+                "No",  # No es constante
+                "Sí",  # Modificable
+                variable.contador_referencias,
+                "Sí" if variable.vivo else "No"
             ))
+
+        # Constantes
+        for nombre, constante in self.tabla_simbolos.constantes_extendidas.items():
+            tabla.insert("", tk.END, values=(
+                nombre,
+                "constante",
+                constante.tipo_dato,
+                constante.linea_declaracion,
+                constante.ambito,
+                constante.direccion_relativa or "N/A",
+                constante.valor,
+                constante.estado,
+                "-",
+                constante.contador_referencias,
+                # NUEVOS CAMPOS:
+                constante.tamanio_bytes,
+                "Sí",  # Es constante
+                "No",  # No modificable
+                constante.contador_referencias,
+                "Sí" if constante.vivo else "No"
+            ))
+
+        # ✅ IGNORAR COMPLETAMENTE LA ESTRUCTURA ANTIGUA
+        print(
+            f"DEBUG: Tabla poblada con {len(self.tabla_simbolos.variables_extendidas)} variables y {len(self.tabla_simbolos.constantes_extendidas)} constantes")
+
+    def _generar_estadisticas(self):
+        """Genera estadísticas de la tabla de símbolos"""
+        stats_text = "=== ESTADÍSTICAS DE LA TABLA DE SÍMBOLOS ===\n\n"
+
+        # ✅ USAR SOLO ESTRUCTURA EXTENDIDA
+        variables = len(self.tabla_simbolos.variables_extendidas)
+        constantes = len(self.tabla_simbolos.constantes_extendidas)
+        funciones = len(self.tabla_simbolos.funciones_extendidas)
+        clases = len(self.tabla_simbolos.clases_extendidas)
+
+        stats_text += f"📊 CONTEO DE SÍMBOLOS:\n"
+        stats_text += f"• Variables: {variables}\n"
+        stats_text += f"• Constantes: {constantes}\n"
+        stats_text += f"• Funciones: {funciones}\n"
+        stats_text += f"• Clases: {clases}\n"
+        stats_text += f"• Total: {variables + constantes + funciones + clases}\n\n"
+
+        # Uso de memoria
+        uso_memoria = self.tabla_simbolos.obtener_uso_memoria_extendido()
+        stats_text += f"💾 USO DE MEMORIA:\n"
+        stats_text += f"• Memoria utilizada: {uso_memoria['memoria_utilizada_bytes']} bytes\n"
+        stats_text += f"• Capacidad total: {uso_memoria['capacidad_total_bytes']} bytes\n"
+        stats_text += f"• Porcentaje de uso: {uso_memoria['porcentaje_uso']}\n\n"
+
+        # Variables por ámbito
+        stats_text += f"🏷️ VARIABLES POR ÁMBITO:\n"
+        for ambito, count in uso_memoria['variables_por_ambito'].items():
+            stats_text += f"• {ambito}: {count} variables\n"
+
+        return stats_text
+
+    def _generar_analisis_optimizacion(self):
+        """Genera análisis para optimización"""
+        analisis_text = "=== ANÁLISIS PARA OPTIMIZACIÓN ===\n\n"
+
+        # ✅ DEBUG DETALLADO: Mostrar contadores actuales
+        analisis_text += "🔍 CONTADORES DE REFERENCIAS ACTUALES:\n"
+
+        # Variables normales
+        for nombre, variable in self.tabla_simbolos.variables_extendidas.items():
+            analisis_text += f"  • {nombre}: {variable.contador_referencias} referencias\n"
+
+        # Constantes
+        for nombre, constante in self.tabla_simbolos.constantes_extendidas.items():
+            analisis_text += f"  • {nombre} (constante): {constante.contador_referencias} referencias\n"
+
+        analisis_text += "\n"
+
+        # Variables no utilizadas (basado en contador > 0)
+        no_utilizadas = []
+        for nombre, variable in self.tabla_simbolos.variables_extendidas.items():
+            if variable.contador_referencias == 0:
+                no_utilizadas.append(nombre)
+
+        analisis_text += f"🚫 VARIABLES NO UTILIZADAS: {len(no_utilizadas)}\n"
+        if no_utilizadas:
+            for var in no_utilizadas:
+                info = self.tabla_simbolos.variables_extendidas.get(var)
+                if info:
+                    analisis_text += f"  • {var} - {info.tipo_dato} ({info.tamanio_bytes} bytes)\n"
+        else:
+            analisis_text += "  ✓ No hay variables no utilizadas\n"
+
+        analisis_text += "\n"
+
+        # Variables muertas
+        muertas = self.tabla_simbolos.obtener_variables_muertas_extendidas()
+        analisis_text += f"💀 VARIABLES MUERTAS: {len(muertas)}\n"
+        if muertas:
+            for var in muertas:
+                info = self.tabla_simbolos.variables_extendidas.get(var)
+                if info:
+                    analisis_text += f"  • {var} - Referencias: {info.contador_referencias}\n"
+        else:
+            analisis_text += "  ✓ No hay variables muertas\n"
+
+        analisis_text += "\n💡 RECOMENDACIONES:\n"
+
+        if no_utilizadas:
+            analisis_text += "• Eliminar variables no utilizadas para ahorrar memoria\n"
+        if muertas:
+            analisis_text += "• Reutilizar variables muertas para optimizar memoria\n"
+
+        uso_memoria = self.tabla_simbolos.obtener_uso_memoria_extendido()
+        if float(uso_memoria['porcentaje_uso'].replace('%', '')) > 70:
+            analisis_text += "• Alto uso de memoria - considerar optimización\n"
+
+        if not no_utilizadas and not muertas:
+            analisis_text += "• El código está bien optimizado en términos de uso de variables\n"
+
+        return analisis_text
 
     def ejecutar(self):
         self.ventana.mainloop()
