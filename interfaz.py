@@ -35,7 +35,7 @@ class Interfaz:
         boton_tabla = ttk.Button(self.ventana, text="Ver tabla de símbolos", command=self.mostrar_tabla)
         boton_tabla.pack(pady=10)
 
-    def mostrar_resultados_errores(self, errores_lex, errores_sint):
+    def mostrar_resultados_errores(self, errores_lex, errores_sint, errores_semanticos):
         ventana_resultados = tk.Toplevel(self.ventana)
         ventana_resultados.title("Resultados del Análisis")
         ventana_resultados.geometry("900x700")
@@ -61,6 +61,26 @@ class Interfaz:
         else:
             area_errores_lex.insert(tk.END, "✅ No se encontraron errores léxicos\n")
         area_errores_lex.config(state="disabled")
+        
+         # Pestaña 2: Errores semanticos
+        frame_errore_semanticos = ttk.Frame(notebook)
+        notebook.add(frame_errore_semanticos, text="🚨 Errores SEMANTICOS")
+
+        # Errores léxicos
+        frame_semanticos = ttk.LabelFrame(frame_errore_semanticos, text="Errores Semánticos")
+        frame_semanticos.pack(fill="both", expand=True, padx=5, pady=5)
+
+        area_errores_sem = tk.Text(frame_semanticos, wrap=tk.WORD, font=("Consolas", 10), fg="red")
+        area_errores_sem.pack(fill="both", expand=True, padx=5, pady=5)
+
+        if errores_semanticos:
+            for e in errores_semanticos:
+                area_errores_sem.insert(tk.END, f"{e}\n")
+        else:
+            area_errores_sem.insert(tk.END, "✅ No se encontraron errores semánticos\n")
+        area_errores_sem.config(state="disabled")
+        
+        
 
         # Pestaña 2: Salida del Intérprete
         frame_salida = ttk.Frame(notebook)
@@ -73,6 +93,8 @@ class Interfaz:
         scroll_salida = ttk.Scrollbar(frame_salida, command=area_salida.yview)
         area_salida.configure(yscrollcommand=scroll_salida.set)
         scroll_salida.pack(side="right", fill="y")
+        
+
 
         # Procesar salida del intérprete
         salida_interprete = []
@@ -86,6 +108,7 @@ class Interfaz:
                 else:
                     errores_reales.append(e)
 
+        
         # Mostrar en pestaña de salida
         if salida_interprete:
             area_salida.insert(tk.END, "=== EJECUCIÓN EXITOSA ===\n\n")
@@ -139,9 +162,10 @@ class Interfaz:
 
         # Usar el analizador sintáctico que ya incluye el parser
         errores_sint = self.analizador_sintactico.analizar(tokens)
-
+        
+        errores_semanticos = self.analizador_sintactico.reporte_errores.errores
         # Mostrar ventanas automáticamente
-        self.mostrar_resultados_errores(errores_lex, errores_sint)
+        self.mostrar_resultados_errores(errores_lex, errores_sint, errores_semanticos)
         self.mostrar_tabla_tokens(tokens)
 
         # También mostrar tabla de símbolos actualizada
@@ -234,7 +258,7 @@ class Interfaz:
 
     def _poblar_tabla_extendida(self, tabla):
         """Pobla la tabla con datos de la estructura extendida"""
-        # ✅ USAR SOLO LA ESTRUCTURA EXTENDIDA
+        # USAR SOLO LA ESTRUCTURA EXTENDIDA
 
         # Variables normales
         for nombre, variable in self.tabla_simbolos.variables_extendidas.items():

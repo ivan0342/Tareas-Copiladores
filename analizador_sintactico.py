@@ -2,19 +2,19 @@
 from parser import Parser, ParserError
 from interprete import Interprete, RuntimeErrorInterp
 from analizador_semantico import AnalizadorSemantico
-
+from verificaciones.clasificacion_errores import ReporteErrores
 
 class AnalizadorSintactico:
     def __init__(self, tabla_simbolos):
         self.tabla_simbolos = tabla_simbolos
-
+        self.reporte_errores = ReporteErrores()
     def analizar(self, tokens):
         print("TOKENS RECIBIDOS POR EL PARSER:")
         for t in tokens:
             print(t)
 
         errores = []
-
+        self.reporte_errores.limpiar()
         print(f"DEBUG: ID de tabla_simbolos en sintactico: {id(self.tabla_simbolos)}")
 
         # Asegurar EOF al final
@@ -24,7 +24,7 @@ class AnalizadorSintactico:
 
         # 1) Parseo -> AST
         try:
-            parser = Parser(tokens, self.tabla_simbolos)
+            parser = Parser(tokens, self.tabla_simbolos, self.reporte_errores)
             ast = parser.parse()
             errores.extend(parser.errores)
         except ParserError as e:
@@ -40,10 +40,11 @@ class AnalizadorSintactico:
         except Exception as e:
             errores.append(f"Error al actualizar tabla de símbolos: {e}")
 
-        # 3) Análisis Semántico - DESACTIVADO TEMPORALMENTE
+        # 3) Análisis Semántico 
 
         try:
-            analizador_semantico = AnalizadorSemantico(self.tabla_simbolos)
+            analizador_semantico = AnalizadorSemantico(self.tabla_simbolos, self.reporte_errores)
+            
             errores_semanticos = analizador_semantico.analizar(ast)
 
             if errores_semanticos:
@@ -101,6 +102,11 @@ class AnalizadorSintactico:
         if salida_lines:
             errores.append("SALIDA_INTERPRETE:")
             errores.extend(salida_lines)
+        
+        print("TOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOS LOS ERROREEEEEEEEEEES DEL REPORTE")
+
+        for i in self.reporte_errores.errores:
+            print(f"error: {i}")
 
         return errores
 

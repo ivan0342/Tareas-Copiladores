@@ -1,32 +1,34 @@
 #analizador_semantico.py
 from verificaciones.verificadot_tipos import VerificadorTipos
 from verificaciones.Validador_funciones import ValidadorFunciones
+from verificaciones.clasificacion_errores import CategoriaError, ReporteErrores
+from verificaciones.validador_incializacion import ValidadorInicializacion
+
 
 class AnalizadorSemantico:
-    def __init__(self, tabla_simbolos):
-        self.tabla_simbolos = tabla_simbolos
-        self.verificador_tipos = VerificadorTipos(tabla_simbolos)
-        self.validador_funciones = ValidadorFunciones(tabla_simbolos, self.verificador_tipos)
+    
+    def __init__(self, tabla_simbolos, reporte_errores):
+
         self.errores = []
-        self.funcion_actual = None
+        self.reporte = reporte_errores
         self.tipo_funcion_actual = None
+        self.tabla_simbolos = tabla_simbolos
+        self.verificador_tipos = VerificadorTipos(tabla_simbolos, reporte_errores)
+        self.validador_funciones = ValidadorFunciones(tabla_simbolos, self.verificador_tipos, reporte_errores)
+        self.validador_inicializacion = ValidadorInicializacion(tabla_simbolos, reporte_errores)
     
     def analizar(self, ast):
         """Realiza el análisis semántico completo del AST"""
-        self.errores = []
-        self.tabla_simbolos.limpiar_errores()
-        self.verificador_tipos.errores = []
-        self.validador_funciones.errores = []
         
         for nodo in ast:
             self._visitar_nodo(nodo)
         
-        # Recolectar todos los errores
-        self.errores.extend(self.tabla_simbolos.obtener_errores_semanticos())
-        self.errores.extend(self.verificador_tipos.errores)
-        self.errores.extend(self.validador_funciones.errores)
+        # 🔥 DEBUG: Imprimir todos los errores encontrados
+        print(f"🔥 DEBUG_SEMANTICO: Se encontraron {len(self.reporte.errores)} errores")
+        for error in self.reporte.errores:
+            print(f"  - {error}")
         
-        return self.errores
+        return self.reporte.errores
     
     def _visitar_nodo(self, nodo):
         """Visita un nodo del AST y realiza las validaciones semánticas"""
@@ -54,6 +56,7 @@ class AnalizadorSemantico:
         elif tipo_nodo == 'VAR':
             self._visitar_variable(nodo)
             
+                
     def _visitar_declaracion_variable(self, nodo):
         """Valida declaración de variable"""
         nombre = nodo['id']
@@ -70,25 +73,40 @@ class AnalizadorSemantico:
             if not self.verificador_tipos.verificar_asignacion(tipo_declarado, tipo_valor, nodo.get('linea', 0)):
                 self.errores.append(f"Línea {nodo.get('linea')}: Tipo incompatible en inicialización de '{nombre}'")
                 
-                
-    
+                self.reporte.agregar_error(CategoriaError.TIPO,
+                                           f"Inicialización incompatible en '{nombre}'",
+                                           nodo.get('linea', 0))
+                print(f"🔥 ERROR: Inicialización incompatible en '{nombre}' en línea {nodo.get('linea', 0)}")
+        if self.validador_inicializacion and valor:
+            self.validador_inicializacion.verificar_variable_no_inicializada(nombre, nodo.get('linea', 0))
+            
+            
     def _visitar_asignacion(self, nodo):
-        """Valida una asignación"""
         nombre = nodo['id']
         valor = nodo['valor']
-        
-        # Verificar que la variable exista
-        if not self.tabla_simbolos.verificar_declaracion(nombre, nodo.get('linea', 0)):
-            return
-        
-        # Verificar tipos
+        linea = nodo.get('linea', 0)
+
         simbolo = self.tabla_simbolos.buscar(nombre)
-        if simbolo:
-            tipo_variable = simbolo.get('tipo_dato')
-            tipo_valor = self.verificador_tipos.obtener_tipo_expresion(valor)
-            
-            if not self.verificador_tipos.verificar_asignacion(tipo_variable, tipo_valor, nodo.get('linea', 0)):
-                self.errores.append(f"Línea {nodo.get('linea')}: Asignación incompatible en '{nombre}'")
+        if not simbolo:
+            self.reporte.agregar_error(CategoriaError.DECLARACION,
+                                       f"Variable '{nombre}' no declarada",
+                                       linea)
+            return
+
+        # constante no modificable
+        if self.validador_inicializacion:
+            self.validador_inicializacion.verificar_modificacion_constante(nombre, linea)
+
+        # verificación de tipos
+        tipo_variable = simbolo.get('tipo_dato')
+        tipo_valor = self.verificador_tipos.obtener_tipo_expresion(valor)
+
+        if not self.verificador_tipos.verificar_asignacion(tipo_variable, tipo_valor, linea):
+            self.reporte.agregar_error(CategoriaError.TIPO,
+                                       f"Asignación incompatible en '{nombre}'",
+                                       linea)
+            print(f"🔥 ERROR: Asignación incompatible en '{nombre}' en línea {linea}"  )
+    
     
     def _visitar_operacion_binaria(self, nodo):
         """Valida una operación binaria"""
@@ -100,6 +118,7 @@ class AnalizadorSemantico:
         )
     
     def _visitar_declaracion_funcion(self, nodo):
+        print("ENTRREEEE A LA FUNCION");
         """Valida declaración de función"""
         self.funcion_actual = nodo.get('nombre')
         self.tipo_funcion_actual = nodo.get('tipo', 'TIPO_VACIO')
@@ -128,6 +147,7 @@ class AnalizadorSemantico:
         self.tipo_funcion_actual = None
         
     def _visitar_llamada_funcion(self, nodo):
+        print("enreeeeeeeeee");
         """Valida llamada a función"""
         self.validador_funciones.validar_llamada_funcion(nodo)
     
@@ -137,14 +157,19 @@ class AnalizadorSemantico:
             self.validador_funciones.validar_retorno(nodo, self.tipo_funcion_actual)
     
     def _visitar_condicional(self, nodo):
-        """Valida condicional"""
+        print("holaaa")
+        linea = nodo.get('linea', 0)
+        print(nodo['cond']);
         tipo_cond = self.verificador_tipos.obtener_tipo_expresion(nodo['cond'])
         if tipo_cond != 'TIPO_BOOLEANO':
-            self.errores.append(f"Línea {nodo.get('linea')}: La condición debe ser booleana")
-        
-        self._visitar_nodo(nodo['then'])
-        if nodo.get('else'):
-            self._visitar_nodo(nodo['else'])
+            self.reporte.agregar_error(CategoriaError.TIPO,
+                                       "La condición del 'si' debe ser booleana",
+                                       linea)
+            print(f"🔥 ERROR: La condición del 'si' debe ser booleana en línea {linea}")
+
+        if nodo.get('SINO'):
+            self._visitar_nodo(nodo['SINO'])
+
     
     def _visitar_bloque(self, nodo):
         """Valida un bloque de código"""
@@ -152,3 +177,14 @@ class AnalizadorSemantico:
         for sentencia in nodo.get('sentencias', []):
             self._visitar_nodo(sentencia)
         self.tabla_simbolos.salir_ambito()
+    
+    def _visitar_variable(self, nodo):
+        nombre = nodo['id']
+        linea = nodo.get('linea', 0)
+
+        simbolo = self.tabla_simbolos.buscar(nombre)
+        if not simbolo:
+            self.reporte.agregar_error(CategoriaError.DECLARACION,
+                                       f"Variable '{nombre}' no declarada",
+                                       linea)
+            print(f"🔥 ERROR: Variable '{nombre}' no declarada en línea {linea}")

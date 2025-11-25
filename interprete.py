@@ -1,6 +1,6 @@
 # archivo: interprete.py
 
-from tabla_simbolos import tabla
+from tabla_simbolos import TablaSimbolos
 
 
 class RuntimeErrorInterp(Exception):
@@ -18,7 +18,7 @@ class Interprete:
         self.output = output
         self.funciones = {}
         self.clases = {}
-        self.tabla_simbolos = tabla_simbolos or tabla  # Usar la tabla proporcionada o la global
+        self.tabla_simbolos = tabla_simbolos  # Usar la tabla proporcionada o la global
 
         # Inicializar memoria con variables globales desde la tabla de símbolos
         if self.tabla_simbolos:

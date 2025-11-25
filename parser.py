@@ -1,16 +1,17 @@
 #parser.py
 from tabla_simbolos import TablaSimbolos
-
+from verificaciones.clasificacion_errores import CategoriaError, ReporteErrores
 class ParserError(Exception):
     pass
 
 class Parser:
-    def __init__(self, tokens, tabla_simbolos):
+    def __init__(self, tokens, tabla_simbolos, reporte_errores):
         self.tokens = tokens
         self.i = 0
         self.errores = []
         self.tabla_simbolos = tabla_simbolos
         self.ast = []  # árbol sintáctico abstracto
+        self.reporte = reporte_errores
 
     def error(self, mensaje):
         tok = self.actual()
@@ -60,6 +61,7 @@ class Parser:
             except ParserError as e:
                 self.errores.append(str(e))
                 self.i += 1
+            print(self.ast)
         return self.ast
 
 
@@ -837,7 +839,22 @@ class Parser:
                     print(f"DEBUG: ✅ Referencia a '{nombre}' - contador: {variable.contador_referencias}")
                 else:
                     print(f"DEBUG: ❌ Variable '{nombre}' no encontrada en tabla extendida")
+                    self.reporte.agregar_error(CategoriaError.DECLARACION, f"Función '{nombre}' no declarada", nodo.get("linea", 0))
 
+
+       
+        elif tipo_nodo == "LLAMADA_FUNCION":
+            nombre_funcion = nodo.get("id")
+            print(f"DEBUG:  Validando llamada a función '{nombre_funcion}' en expresión")
+            
+            # Validar que la función existe
+            if hasattr(self.tabla_simbolos, 'buscar'):
+                funcion = self.tabla_simbolos.buscar(nombre_funcion)
+                if not funcion or funcion.get('categoria') != 'funcion':
+                    print(f"DEBUG:  Función '{nombre_funcion}' no encontrada en tabla de símbolos")
+                    self.reporte.agregar_error(CategoriaError.DECLARACION, f"Función '{nombre_funcion}' no declarada", nodo.get("linea",0 ))
+                else:                    
+                    print(f"DEBUG:  Función '{nombre_funcion}' encontrada en tabla de símbolos")
         # Procesar recursivamente subexpresiones
         if "izq" in nodo:
             self._procesar_referencias_en_expresion(nodo["izq"])
@@ -1060,6 +1077,7 @@ class Parser:
         return params
     
     def llamada_funcion(self):
+        print("holaaaaa");
         nombre = self.match("IDENTIFICADOR")["token"]
         # CORREGIR: Incrementar contador de llamadas a función
         if hasattr(self.tabla_simbolos, 'buscar_funcion_extendida'):
