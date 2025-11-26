@@ -338,13 +338,13 @@ class Interfaz:
         return stats_text
 
     def _generar_analisis_optimizacion(self):
-        """Genera análisis para optimización"""
+        """Genera análisis para optimización CORREGIDO"""
         analisis_text = "=== ANÁLISIS PARA OPTIMIZACIÓN ===\n\n"
 
-        # ✅ DEBUG DETALLADO: Mostrar contadores actuales
+        # ✅ DEBUG DETALLADO: Mostrar contadores actuales CORREGIDO
         analisis_text += "🔍 CONTADORES DE REFERENCIAS ACTUALES:\n"
 
-        # Variables normales
+        # Variables normales - CORREGIDO: Usar estructura extendida
         for nombre, variable in self.tabla_simbolos.variables_extendidas.items():
             analisis_text += f"  • {nombre}: {variable.contador_referencias} referencias\n"
 
@@ -354,7 +354,7 @@ class Interfaz:
 
         analisis_text += "\n"
 
-        # Variables no utilizadas (basado en contador > 0)
+        # Variables no utilizadas (basado en contador == 0) - CORREGIDO
         no_utilizadas = []
         for nombre, variable in self.tabla_simbolos.variables_extendidas.items():
             if variable.contador_referencias == 0:
@@ -397,6 +397,8 @@ class Interfaz:
             analisis_text += "• El código está bien optimizado en términos de uso de variables\n"
 
         return analisis_text
+
+#---------------------------------------------------------------
 
     def ejecutar(self):
         self.ventana.mainloop()

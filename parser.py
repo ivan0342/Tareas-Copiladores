@@ -822,7 +822,7 @@ class Parser:
     # -------------------------------------------------------
 
     def _procesar_referencias_en_expresion(self, nodo):
-        """Recorre una expresión e incrementa contadores de variables usadas"""
+        """Recorre una expresión e incrementa contadores de variables usadas - CORREGIDO"""
         if not isinstance(nodo, dict):
             return
 
@@ -837,9 +837,15 @@ class Parser:
                 if variable:
                     variable.contador_referencias += 1
                     print(f"DEBUG: ✅ Referencia a '{nombre}' - contador: {variable.contador_referencias}")
+
+                    # CORRECCIÓN: Sincronizar con estructura antigua
+                    simbolo_antiguo = self.tabla_simbolos.buscar(nombre)
+                    if simbolo_antiguo:
+                        if "contador_referencias" not in simbolo_antiguo:
+                            simbolo_antiguo["contador_referencias"] = 0
+                        simbolo_antiguo["contador_referencias"] += 1
                 else:
                     print(f"DEBUG: ❌ Variable '{nombre}' no encontrada en tabla extendida")
-                    self.reporte.agregar_error(CategoriaError.DECLARACION, f"Función '{nombre}' no declarada", nodo.get("linea", 0))
 
 
        

@@ -359,7 +359,7 @@ class TablaSimbolos:
 
     def insertar_variable_extendida(self, nombre: str, tipo_dato: str, linea: int,
                                     es_constante: bool = False, valor=None) -> bool:
-        """NUEVO MÉTODO - Insertar variable en estructura extendida"""
+        """NUEVO MÉTODO - Insertar variable en estructura extendida CORREGIDO"""
         if self.buscar_variable_extendida_ambito_actual(nombre):
             self.errores_semanticos.append(f"Variable '{nombre}' ya declarada en ámbito actual")
             return False
@@ -369,6 +369,9 @@ class TablaSimbolos:
         variable.es_constante = es_constante
         variable.valor = valor
         variable.direccion_relativa = self._asignar_direccion_extendida(variable.tamanio_bytes)
+
+        # CORRECCIÓN: Inicializar contador explícitamente
+        variable.contador_referencias = 0
 
         if es_constante:
             self.constantes_extendidas[nombre] = variable
@@ -473,15 +476,18 @@ class TablaSimbolos:
             self.grafo_referencias[simbolo]["referencias"].append(tipo_referencia)
 
     def obtener_variables_no_utilizadas_extendidas(self) -> List[str]:
-        """NUEVO MÉTODO - Identificar variables no utilizadas"""
+        """NUEVO MÉTODO - Identificar variables no utilizadas CORREGIDO"""
         print("DEBUG: Calculando variables no utilizadas...")
         no_utilizadas = []
 
         for nombre, variable in self.variables_extendidas.items():
             print(f"DEBUG: Variable '{nombre}' - referencias: {variable.contador_referencias}")
+            # CORRECCIÓN: Solo considerar variables con 0 referencias como no utilizadas
             if variable.contador_referencias == 0:
                 no_utilizadas.append(nombre)
                 print(f"DEBUG: → '{nombre}' marcada como no utilizada")
+            else:
+                print(f"DEBUG: → '{nombre}' TIENE {variable.contador_referencias} referencias - NO es no utilizada")
 
         print(f"DEBUG: Total variables no utilizadas: {len(no_utilizadas)}")
         return no_utilizadas
