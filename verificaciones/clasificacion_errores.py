@@ -24,6 +24,10 @@ class ReporteErrores:
     def __init__(self):
         self.errores = []
 
+    def limpiar(self):
+        """Limpia todos los errores del reporte"""
+        self.errores = []
+
     def agregar_error(self, categoria: CategoriaError, mensaje: str, linea: int, severidad="ERROR"):
         self.errores.append(ErrorSemantico(categoria, mensaje, linea, severidad))
         print("TODOS LOS ERROREEEEEEEEEEES")

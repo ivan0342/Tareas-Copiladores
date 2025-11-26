@@ -177,14 +177,33 @@ class AnalizadorSemantico:
         for sentencia in nodo.get('sentencias', []):
             self._visitar_nodo(sentencia)
         self.tabla_simbolos.salir_ambito()
-    
+
     def _visitar_variable(self, nodo):
         nombre = nodo['id']
         linea = nodo.get('linea', 0)
 
-        simbolo = self.tabla_simbolos.buscar(nombre)
-        if not simbolo:
-            self.reporte.agregar_error(CategoriaError.DECLARACION,
-                                       f"Variable '{nombre}' no declarada",
-                                       linea)
-            print(f"🔥 ERROR: Variable '{nombre}' no declarada en línea {linea}")
+        # 🔥 Búsqueda MÁS ROBUSTA en todas las estructuras posibles
+        encontrada = False
+
+        # 1. Buscar en variables extendidas
+        if hasattr(self.tabla_simbolos, 'variables_extendidas') and nombre in self.tabla_simbolos.variables_extendidas:
+            print(f"DEBUG_SEMANTICO: ✅ Variable '{nombre}' encontrada en variables_extendidas")
+            encontrada = True
+
+        # 2. Buscar en constantes extendidas
+        elif hasattr(self.tabla_simbolos,
+                     'constantes_extendidas') and nombre in self.tabla_simbolos.constantes_extendidas:
+            print(f"DEBUG_SEMANTICO: ✅ Constante '{nombre}' encontrada en constantes_extendidas")
+            encontrada = True
+
+        # 3. Buscar en estructura antigua
+        elif self.tabla_simbolos.buscar(nombre):
+            print(f"DEBUG_SEMANTICO: ✅ Variable '{nombre}' encontrada en estructura antigua")
+            encontrada = True
+
+        # 4. Si no se encuentra, mostrar error PERO CONTINUAR
+        if not encontrada:
+            error_msg = f"Variable '{nombre}' no declarada"
+            self.reporte.agregar_error(CategoriaError.DECLARACION, error_msg, linea)
+            print(f"🔥 ERROR_SEMANTICO: {error_msg} en línea {linea}")
+            # 🔥 IMPORTANTE: No retornamos, solo registramos el error y continuamos

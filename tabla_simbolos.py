@@ -18,6 +18,8 @@ class InformacionVariable:
         self.valor = None
         self.vivo = True
 
+
+
     def _calcular_tamanio(self, tipo_dato: str) -> int:
         """Calcular tamaño basado solo en el tipo (versión simplificada)"""
         tamanios = {
@@ -170,6 +172,48 @@ class TablaSimbolos:
         self.clases_extendidas: Dict[str, InformacionClase] = {}
         self.constantes_extendidas: Dict[str, InformacionVariable] = {}
         self.grafo_referencias = {}
+
+    def resetear(self):
+        """Reinicia la tabla de símbolos PERO preserva contadores de referencias"""
+        print("DEBUG: Realizando reset selectivo - PRESERVANDO contadores")
+
+        # ========== ESTRUCTURA ANTIGUA ==========
+        self.memoria = []
+        self.overflow = []
+        self.direccion_actual = 0
+        # NO resetear: self.contador_direccion (para mantener direcciones únicas)
+        self.pila_ambitos = ["Global"]
+        self.errores_semanticos = []
+        self.simbolos_por_ambito = {"Global": []}
+
+        # ========== ESTRUCTURA NUEVA EXTENDIDA ==========
+        # 🔥 CORRECCIÓN CRÍTICA: PRESERVAR contadores de referencias
+        # Solo limpiar valores temporales, NO los contadores
+
+        # Para variables extendidas
+        for nombre, variable in self.variables_extendidas.items():
+            # Preservar el contador de referencias
+            contador_actual = variable.contador_referencias
+            # Resetear otros campos
+            variable.valor = None
+            variable.estado = "declarada"
+            variable.vivo = True
+            # 🔥 RESTAURAR el contador preservado
+            variable.contador_referencias = contador_actual
+            print(f"DEBUG: Variable '{nombre}' - contador preservado: {contador_actual}")
+
+        # Para constantes extendidas
+        for nombre, constante in self.constantes_extendidas.items():
+            contador_actual = constante.contador_referencias
+            constante.valor = None
+            constante.estado = "declarada"
+            constante.contador_referencias = contador_actual
+            print(f"DEBUG: Constante '{nombre}' - contador preservado: {contador_actual}")
+
+        # Resetear otras estructuras que no afectan contadores
+        self.grafo_referencias = {}
+
+        print("DEBUG: Reset selectivo completado - contadores PRESERVADOS")
 
     # ========== MÉTODOS ANTIGUOS (COMPATIBILIDAD CON PARSER ACTUAL) ==========
 

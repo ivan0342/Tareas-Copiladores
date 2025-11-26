@@ -74,6 +74,12 @@ class AnalizadorLexico:
             ";": "PUNTO_Y_COMA", ",": "COMA", ".": "PUNTO", ":": "DOS_PUNTOS"
         }
 
+    def resetear(self):
+        """Reinicia el estado del analizador léxico"""
+        self.tokens_validos = []
+        self.errores_lexicos = []
+        self.ambito = "Global"
+
     def tokenize(self, texto):
         self.tokens_validos = []
         self.errores_lexicos = []

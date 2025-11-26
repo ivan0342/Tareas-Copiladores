@@ -14,6 +14,49 @@ class VerificadorTipos:
             "AND": "&&", "OR": "||", "NOT": "!"
         }
 
+    def _inferir_tipo_operacion(self, tipo_izq, tipo_der, operador):
+        """Infere el tipo resultante de una operación binaria"""
+
+        # Mapear tipos a formato estándar
+        mapeo_tipos = {
+            'entero': 'TIPO_ENTERO',
+            'flotante': 'TIPO_FLOTANTE',
+            'booleano': 'TIPO_BOOLEANO',
+            'cadena': 'TIPO_CADENA',
+            'caracter': 'TIPO_CARACTER',
+            'TIPO_ENTERO': 'TIPO_ENTERO',
+            'TIPO_FLOTANTE': 'TIPO_FLOTANTE',
+            'TIPO_BOOLEANO': 'TIPO_BOOLEANO',
+            'TIPO_CADENA': 'TIPO_CADENA',
+            'TIPO_CARACTER': 'TIPO_CARACTER'
+        }
+
+        tipo_izq = mapeo_tipos.get(tipo_izq, tipo_izq)
+        tipo_der = mapeo_tipos.get(tipo_der, tipo_der)
+
+        print(f"DEBUG_TIPOS: Inferiendo tipo para {tipo_izq} {operador} {tipo_der}")
+
+        # Operaciones aritméticas
+        if operador in ['MAS', 'MENOS', 'MULT', 'DIV', 'MOD']:
+            if tipo_izq == 'TIPO_CADENA' or tipo_der == 'TIPO_CADENA':
+                return 'TIPO_CADENA'  # Concatenación
+            elif tipo_izq == 'TIPO_FLOTANTE' or tipo_der == 'TIPO_FLOTANTE':
+                return 'TIPO_FLOTANTE'
+            elif tipo_izq == 'TIPO_ENTERO' and tipo_der == 'TIPO_ENTERO':
+                return 'TIPO_ENTERO'
+
+        # Operaciones de comparación
+        elif operador in ['IGUAL', 'DISTINTO', 'MENOR', 'MAYOR', 'MENOR_IGUAL', 'MAYOR_IGUAL']:
+            return 'TIPO_BOOLEANO'
+
+        # Operaciones lógicas
+        elif operador in ['AND', 'OR']:
+            if tipo_izq == 'TIPO_BOOLEANO' and tipo_der == 'TIPO_BOOLEANO':
+                return 'TIPO_BOOLEANO'
+
+        print(f"DEBUG_TIPOS: ❌ Operación {operador} no válida entre {tipo_izq} y {tipo_der}")
+        return "DESCONOCIDO"
+
     def normalizar_tipo(self, tipo):
         # Evitar None
         if not tipo:
@@ -276,90 +319,97 @@ class VerificadorTipos:
         return 'DESCONOCIDO'
 
     # ---------- Obtener tipo de expresión (central) ----------
+
     def obtener_tipo_expresion(self, nodo):
-        """Determina el tipo de una expresión AST y reporta errores relevantes."""
-        if not isinstance(nodo, dict):
-            return 'DESCONOCIDO'
+        """Obtiene el tipo de una expresión - VERSIÓN CORREGIDA"""
+        if nodo is None:
+            return "DESCONOCIDO"
 
         tipo_nodo = nodo.get('nodo')
 
         # Literales
-        if tipo_nodo in ('LIT_INT', 'ENTERO_LIT'):
+        if tipo_nodo == 'LIT_INT':
             return 'TIPO_ENTERO'
-        if tipo_nodo in ('LIT_FLOAT', 'FLOTANTE_LIT'):
+        elif tipo_nodo == 'LIT_FLOAT':
             return 'TIPO_FLOTANTE'
-        if tipo_nodo in ('LIT_STR', 'CADENA_LIT'):
+        elif tipo_nodo == 'LIT_STR':
             return 'TIPO_CADENA'
-        if tipo_nodo in ('LIT_BOOL', 'BOOLEANO_LIT'):
+        elif tipo_nodo == 'LIT_BOOL':
             return 'TIPO_BOOLEANO'
-        if tipo_nodo in ('LIT_CHAR', 'CARACTER_LIT'):
+        elif tipo_nodo == 'LIT_CHAR':
             return 'TIPO_CARACTER'
 
-        # Variable: buscar en tabla
-        if tipo_nodo == 'VAR':
+        # Variables - 🔥 CORRECCIÓN CRÍTICA
+        elif tipo_nodo == 'VAR':
             nombre = nodo.get('id')
+            print(f"DEBUG_TIPOS: Buscando tipo de variable '{nombre}'")
+
+            # Buscar PRIMERO en estructura extendida
+            if hasattr(self.tabla_simbolos, 'variables_extendidas'):
+                if nombre in self.tabla_simbolos.variables_extendidas:
+                    tipo = self.tabla_simbolos.variables_extendidas[nombre].tipo_dato
+                    print(f"DEBUG_TIPOS: ✅ Variable '{nombre}' encontrada en extendida - tipo: {tipo}")
+                    return tipo
+
+            if hasattr(self.tabla_simbolos, 'constantes_extendidas'):
+                if nombre in self.tabla_simbolos.constantes_extendidas:
+                    tipo = self.tabla_simbolos.constantes_extendidas[nombre].tipo_dato
+                    print(f"DEBUG_TIPOS: ✅ Constante '{nombre}' encontrada en extendida - tipo: {tipo}")
+                    return tipo
+
+            # Buscar en estructura antigua
             simbolo = self.tabla_simbolos.buscar(nombre)
             if simbolo:
-                return self.normalizar_tipo(simbolo.get('tipo_dato', 'DESCONOCIDO'))
-            else:
-                self.reporte.agregar_error(CategoriaError.DECLARACION, f"Variable '{nombre}' no declarada", nodo.get('linea', 0))
-                return 'DESCONOCIDO'
+                tipo = simbolo.get('tipo_dato', 'DESCONOCIDO')
+                print(f"DEBUG_TIPOS: ✅ Variable '{nombre}' encontrada en antigua - tipo: {tipo}")
+                return tipo
 
-        # Acceso a arreglo
-        if tipo_nodo == 'ACCESO_ARREGLO':
-            return self.verificar_acceso_arreglo(nodo)
+            print(f"DEBUG_TIPOS: ❌ Variable '{nombre}' NO encontrada en ninguna estructura")
+            return "DESCONOCIDO"
 
-        # Llamada a función / método
-        if tipo_nodo in ('LLAMADA_FUNCION', 'LLAMADA_METODO'):
-            id_func = nodo.get('id') or nodo.get('nombre')
-            simbolo = self.tabla_simbolos.buscar(id_func) if id_func else None
-            linea = nodo.get('linea', 0)
-            if simbolo:
-                # detectar funciones obsoletas si el símbolo lo indica
-                if simbolo.get('obsoleta'):
-                    self.reporte.agregar_error(CategoriaError.EJECUCION, f"Uso de función obsoleta '{id_func}'", linea, severidad="ADVERTENCIA")
-                return self.normalizar_tipo(simbolo.get('tipo_dato', 'DESCONOCIDO'))
-            else:
-                self.reporte.agregar_error(CategoriaError.DECLARACION, f"Función '{id_func}' no declarada", linea)
-                return 'DESCONOCIDO'
+        # Operaciones binarias
+        elif tipo_nodo == 'BIN_OP':
+            try:
+                tipo_izq = self.obtener_tipo_expresion(nodo.get('izq'))
+                tipo_der = self.obtener_tipo_expresion(nodo.get('der'))
+                op = nodo.get('op')
 
-        # Operación unaria
-        if tipo_nodo == 'UNARIO':
-            return self.verificar_unario(nodo)
+                print(f"DEBUG_TIPOS: Operación {op} entre {tipo_izq} y {tipo_der}")
 
-        # Operación binaria
-        if tipo_nodo == 'BIN_OP':
-            izq = nodo.get('izq')
-            der = nodo.get('der')
-            linea = nodo.get('linea', 0)
-            op = self._normalizar_operacion(nodo.get('op'))
+                # Si alguno es desconocido, retornar desconocido
+                if tipo_izq == "DESCONOCIDO" or tipo_der == "DESCONOCIDO":
+                    return "DESCONOCIDO"
 
-            # obtener tipos de subexpresiones
-            tipo_izq = self.obtener_tipo_expresion(izq) if izq is not None else None
-            tipo_der = self.obtener_tipo_expresion(der) if der is not None else None
+                # Lógica de inferencia de tipos
+                return self._inferir_tipo_operacion(tipo_izq, tipo_der, op)
+            except Exception as e:
+                print(f"DEBUG_TIPOS: Error en operación binaria: {e}")
+                return "DESCONOCIDO"
 
-            # operandos faltantes
-            if tipo_izq is None or tipo_der is None:
-                self.reporte.agregar_error(CategoriaError.TIPO, f"Operador '{op}' con operandos faltantes", linea)
-                return 'DESCONOCIDO'
+        # Llamadas a función
+        elif tipo_nodo == 'LLAMADA_FUNCION':
+            nombre_funcion = nodo.get('id')
+            print(f"DEBUG_TIPOS: Llamada a función '{nombre_funcion}'")
 
-            # verificar compatibilidad
-            if not self.verificar_compatibilidad(tipo_izq, tipo_der, op, linea):
-                return 'DESCONOCIDO'
+            # Buscar función en tabla extendida
+            if hasattr(self.tabla_simbolos, 'funciones_extendidas'):
+                if nombre_funcion in self.tabla_simbolos.funciones_extendidas:
+                    tipo_retorno = self.tabla_simbolos.funciones_extendidas[nombre_funcion].tipo_retorno
+                    print(f"DEBUG_TIPOS: ✅ Función '{nombre_funcion}' encontrada - tipo retorno: {tipo_retorno}")
+                    return tipo_retorno
 
-            # detectar división por cero literal
-            if op in ['/', 'DIV', '%', 'MOD']:
-                self.verificar_division_por_cero(nodo)
+            # Buscar en estructura antigua
+            funcion = self.tabla_simbolos.buscar(nombre_funcion)
+            if funcion and funcion.get('categoria') == 'funcion':
+                tipo_retorno = funcion.get('tipo_dato', 'TIPO_VACIO')
+                print(f"DEBUG_TIPOS: ✅ Función '{nombre_funcion}' encontrada en antigua - tipo: {tipo_retorno}")
+                return tipo_retorno
 
-            # resultado según operación
-            if op in ['+', '-', '*', '/', '%']:
-                if 'TIPO_FLOTANTE' in (tipo_izq, tipo_der):
-                    return 'TIPO_FLOTANTE'
-                return 'TIPO_ENTERO'
-            if op in ['==', '!=', '<', '>', '<=', '>=', '&&', '||']:
-                return 'TIPO_BOOLEANO'
+            print(f"DEBUG_TIPOS: ❌ Función '{nombre_funcion}' no encontrada")
+            return "DESCONOCIDO"
 
-            return 'DESCONOCIDO'
+        # Expresiones entre paréntesis
+        elif tipo_nodo in ['PAREN_IZQ', 'PAREN_DER']:
+            return self.obtener_tipo_expresion(nodo.get('expr'))
 
-        # Otros nodos no manejados
-        return 'DESCONOCIDO'
+        return "DESCONOCIDO"
