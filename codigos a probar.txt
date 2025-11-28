@@ -1,0 +1,109 @@
+//////////////////////////////////////////// este de aqui que es el primero es el que digo que se detiene en cuando detecta que la funcion hola() no esta
+
+entero a = 10;
+
+vacio b(){
+
+  entero c = 4;
+  imprimir(c);
+}
+
+imprimir(a);
+
+imprimir(hola());
+entero i = 3 + "hola";
+imprimir(i);
+
+
+////////////////////////////////////////////
+entero a(entero x, cadena b){
+    imprimir(x);
+    imprimir(b);
+    
+
+    retornar x;
+}
+
+entero c  =a("hola");
+
+imprimir(c);
+
+///////////////////////////////////////
+
+entero a = 10;
+
+imprimir(a);
+vacio b(entero a){
+
+  entero c = 4;
+  imprimir(c);
+  imprimir(5);
+	
+
+}
+
+b(5);
+imprimir(a);
+
+//////////////////////////////////////
+
+entero a(){
+  imprimir(5);
+ 
+
+
+}
+
+////////////////////////////
+entero a(){
+  imprimir(5);
+
+}
+
+a();
+
+////////////////////////////////////////////////////////////
+
+imprimir(5+"hola");
+
+
+
+/////////////////////////////////////////////////////////////////
+
+entero a(){
+  imprimir(5);
+  return 4;
+}
+
+a();
+////////////////////////////////////////////////////////////////
+
+vacio a(){
+  imprimir(5);
+  retornar 4;
+}
+
+a();
+
+///////////////////////////////////////////////////////////////
+entero func(entero a){
+    imprimir(a);
+    retornar 5+7;
+}
+
+imprimir(func(5));
+
+/////////////////////////////////////////////////////////////
+entero func(entero a){
+   imprimir(a);
+   
+  retornar 6;
+
+
+}
+
+imprimir(func(3));
+////////////////////////////////////////////////////////////
+constante entero a = 6;
+a = 4;
+imprimir(a);

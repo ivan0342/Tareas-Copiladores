@@ -8,6 +8,7 @@ class AnalizadorSintactico:
     def __init__(self, tabla_simbolos):
         self.tabla_simbolos = tabla_simbolos
         self.reporte_errores = ReporteErrores()
+        
     def analizar(self, tokens):
         print("TOKENS RECIBIDOS POR EL PARSER:")
         for t in tokens:
@@ -43,7 +44,7 @@ class AnalizadorSintactico:
         # 3) Análisis Semántico 
 
         try:
-            analizador_semantico = AnalizadorSemantico(self.tabla_simbolos, self.reporte_errores)
+            analizador_semantico = AnalizadorSemantico(self.tabla_simbolos, self.reporte_errores, tokens)
             
             errores_semanticos = analizador_semantico.analizar(ast)
 
@@ -64,7 +65,7 @@ class AnalizadorSintactico:
             print(f"  {i}: {simbolo}")
 
         if not simbolos:
-            print("  (vacía)")
+            print("(vacía)")
 
         # 5) Ejecutar AST con intérprete
         salida_lines = []
@@ -103,10 +104,7 @@ class AnalizadorSintactico:
             errores.append("SALIDA_INTERPRETE:")
             errores.extend(salida_lines)
         
-        print("TOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOS LOS ERROREEEEEEEEEEES DEL REPORTE")
 
-        for i in self.reporte_errores.errores:
-            print(f"error: {i}")
 
         return errores
 

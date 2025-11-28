@@ -122,6 +122,7 @@ class Interprete:
                     f"Variable no declarada: {nombre} (línea {nodo.get('linea')})"
                 )
 
+
             self.memoria[nombre] = val
 
             # Actualizar también en tabla de símbolos
@@ -184,7 +185,7 @@ class Interprete:
                 valor = self.memoria[name]
                 print(f"DEBUG: Encontrada en memoria local: {valor}")
                 return valor
-
+  
             # ✅ BUSCAR EN TABLA EXTENDIDA PRIMERO
             if self.tabla_simbolos:
                 # Buscar en variables extendidas
@@ -234,7 +235,8 @@ class Interprete:
                             return ' '
                         else:
                             return None
-
+                else:
+                    print(f"DEBUG: Variable '{name}' no encontrada en tabla de símbolos.")
             # Si no está en ninguno, error
             raise RuntimeErrorInterp(f"Símbolo '{name}' no encontrado en la tabla.")
 

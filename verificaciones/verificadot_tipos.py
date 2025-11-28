@@ -276,7 +276,7 @@ class VerificadorTipos:
         return 'DESCONOCIDO'
 
     # ---------- Obtener tipo de expresión (central) ----------
-    def obtener_tipo_expresion(self, nodo):
+    def obtener_tipo_expresion(self, nodo , linea):
         """Determina el tipo de una expresión AST y reporta errores relevantes."""
         if not isinstance(nodo, dict):
             return 'DESCONOCIDO'
@@ -302,7 +302,7 @@ class VerificadorTipos:
             if simbolo:
                 return self.normalizar_tipo(simbolo.get('tipo_dato', 'DESCONOCIDO'))
             else:
-                self.reporte.agregar_error(CategoriaError.DECLARACION, f"Variable '{nombre}' no declarada", nodo.get('linea', 0))
+                self.reporte.agregar_error(CategoriaError.DECLARACION, f"Variable '{nombre}' no declarada", linea)
                 return 'DESCONOCIDO'
 
         # Acceso a arreglo
