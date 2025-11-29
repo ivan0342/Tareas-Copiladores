@@ -1,0 +1,135 @@
+// Caso 1
+
+entero valorCaso1_1 = 10;
+
+vacio funcion_1(){
+  entero valorCaso1Local_1 = 4;
+  imprimir(valorCaso1Local_1);
+}
+
+imprimir(valorCaso1_1);
+
+imprimir(hola());
+entero valorCaso1_2 = 3 + "hola";
+imprimir(valorCaso1_2);
+
+// Caso 2
+
+entero valorCaso2_1(entero parametroCaso1_a, cadena parametroCaso2_b){
+    imprimir(x);
+    imprimir(b);
+    retornar x;
+}
+
+entero c  = a("hola");
+
+imprimir(c);
+
+// Caso 3
+
+entero a = 10;
+
+imprimir(a);
+vacio b(entero a){
+  entero c = 4;
+  imprimir(c);
+  imprimir(5);
+}
+
+b(5);
+imprimir(a);
+
+// Caso 4
+
+entero a(){
+  imprimir(5);
+}
+
+// Caso 5
+
+entero a(){
+  imprimir(5);
+}
+
+a();
+
+// Caso 6
+
+imprimir(5 + "hola");
+
+// Caso 7
+
+entero a(){
+  imprimir(5);
+  return 4;
+}
+
+a();
+
+// Caso 8
+
+vacio a(){
+  imprimir(5);
+  retornar 4;
+}
+
+a();
+
+entero a(){
+  imprimir(5);
+  retornar 4;
+}
+
+entero valor = a();
+
+// Caso 9
+
+entero func(entero a){
+    imprimir(a);
+    retornar 5 + 7;
+}
+
+imprimir(func(5));
+
+entero func(entero a){
+    imprimir(a);
+    retornar 5 + 7;
+}
+
+entero valor = func(5);
+
+// Caso 10
+
+entero func(entero a){
+   imprimir(a);
+   retornar 6;
+}
+
+imprimir(func(3));
+
+// Caso 11
+
+constante entero a = 6;
+a = 4;
+imprimir(a);
+
+// Caso 12
+
+// Código de prueba con optimizaciones
+
+entero x = 10;
+
+// Debería optimizarse a y = x
+entero y = x * 1;
+
+//Debería optimizarse a z = y
+entero z = 0 + y;
+
+entero i = 0;
+mientras (i < 5) {
+    // Posible reducción de fuerza
+    entero j = i * 2;
+    i = i + 1;
+};
+
+imprimir("Resultado: " + z);

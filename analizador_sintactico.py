@@ -4,10 +4,12 @@ from interprete import Interprete, RuntimeErrorInterp
 from analizador_semantico import AnalizadorSemantico
 from verificaciones.clasificacion_errores import ReporteErrores
 
+
 class AnalizadorSintactico:
     def __init__(self, tabla_simbolos):
         self.tabla_simbolos = tabla_simbolos
         self.reporte_errores = ReporteErrores()
+        self.optimizador_multinivel = None  # 🔥 AGREGAR ESTA LÍNEA
 
     def analizar(self, tokens):
         print("TOKENS RECIBIDOS POR EL PARSER:")
@@ -18,20 +20,14 @@ class AnalizadorSintactico:
         self.reporte_errores.limpiar()
         print(f"DEBUG: ID de tabla_simbolos en sintactico: {id(self.tabla_simbolos)}")
 
-        # ✅ CORRECCIÓN CRÍTICA: Guardar referencia a la tabla actual para usar después
-        tabla_original = self.tabla_simbolos
-
         # Asegurar EOF al final
         if not tokens or tokens[-1].get("tipo") != "EOF":
             tokens = tokens[:]
             tokens.append({"token": "EOF", "tipo": "EOF", "linea": -1, "columna": -1})
 
-        # 1) Parseo -> AST (esto pobla la tabla de símbolos)
-        ast = None
-        parser = None
+        # 1) Parseo -> AST
         try:
-            # ✅ USAR LA MISMA INSTANCIA de tabla_simbolos
-            parser = Parser(tokens, tabla_original, self.reporte_errores)
+            parser = Parser(tokens, self.tabla_simbolos, self.reporte_errores)
             ast = parser.parse()
             errores.extend(parser.errores)
         except ParserError as e:
@@ -40,32 +36,21 @@ class AnalizadorSintactico:
 
         print(f"DEBUG: AST generado con {len(ast)} nodos")
 
-        # 🔥 VERIFICAR QUE LA TABLA SIGUE SIENDO LA MISMA
-        print(f"DEBUG: ID de tabla después del parsing: {id(self.tabla_simbolos)}")
-        print(f"DEBUG: ¿Misma instancia? {self.tabla_simbolos is tabla_original}")
+        # Aplicar optimizaciones multinivel al AST
+        try:
+            print("🔄 Aplicando optimizaciones multinivel...")
+            from optimizador import OptimizadorMultinivel
+            self.optimizador_multinivel = OptimizadorMultinivel(self.tabla_simbolos)
+            ast_optimizado = self.optimizador_multinivel.optimizar(ast)
+            ast = ast_optimizado
+            print("✅ Optimizaciones aplicadas correctamente")
 
-        # 🔥 CORRECCIÓN CRÍTICA: Verificar estado REAL de la tabla DESPUÉS del parsing
-        print("DEBUG: ========== ESTADO DE LA TABLA DESPUÉS DEL PARSING ==========")
-
-        # Mostrar estructura antigua
-        simbolos_antiguos = self.tabla_simbolos.obtener_todos()
-        print(f"DEBUG: Símbolos en estructura antigua: {len(simbolos_antiguos)}")
-        for i, simbolo in enumerate(simbolos_antiguos):
-            print(f"  {i}: {simbolo.get('identificador', 'N/A')} - {simbolo.get('tipo_dato', 'N/A')}")
-
-        # Mostrar estructura extendida
-        if hasattr(self.tabla_simbolos, 'variables_extendidas'):
-            print(f"DEBUG: Variables en estructura extendida: {len(self.tabla_simbolos.variables_extendidas)}")
-            for nombre, variable in self.tabla_simbolos.variables_extendidas.items():
-                print(
-                    f"  {nombre}: {variable.tipo_dato} - refs: {variable.contador_referencias} - valor: {variable.valor}")
-        else:
-            print("DEBUG: ❌ NO existe estructura variables_extendidas")
-
-        if hasattr(self.tabla_simbolos, 'constantes_extendidas'):
-            print(f"DEBUG: Constantes en estructura extendida: {len(self.tabla_simbolos.constantes_extendidas)}")
-            for nombre, constante in self.tabla_simbolos.constantes_extendidas.items():
-                print(f"  {nombre}: {constante.tipo_dato} - refs: {constante.contador_referencias}")
+        except Exception as e:
+            print(f"⚠️  Error en optimizaciones: {e}")
+            # Crear un optimizador vacío para que la interfaz funcione
+            from optimizador import OptimizadorMultinivel
+            self.optimizador_multinivel = OptimizadorMultinivel(self.tabla_simbolos)
+            print("✅ Optimizador creado en modo compatibilidad")
 
         # 2) Poblar la tabla de símbolos (VERSIÓN SIMPLIFICADA) - PRIMERO
         try:
@@ -74,38 +59,33 @@ class AnalizadorSintactico:
         except Exception as e:
             errores.append(f"Error al actualizar tabla de símbolos: {e}")
 
-        # 🔥 DECISIÓN: Ejecutar análisis semántico SOLO si hay variables en la tabla extendida
-        tiene_variables_extendidas = (hasattr(self.tabla_simbolos, 'variables_extendidas') and
-                                      len(self.tabla_simbolos.variables_extendidas) > 0)
+        # 3) Análisis Semántico 
 
-        if tiene_variables_extendidas:
-            print("DEBUG: ✅ Ejecutando análisis semántico (hay variables en tabla extendida)")
-            try:
-                analizador_semantico = AnalizadorSemantico(self.tabla_simbolos, self.reporte_errores)
-                errores_semanticos = analizador_semantico.analizar(ast)
+        try:
+            analizador_semantico = AnalizadorSemantico(self.tabla_simbolos, self.reporte_errores)
+            
+            errores_semanticos = analizador_semantico.analizar(ast)
 
-                if errores_semanticos:
-                    print("DEBUG: Se encontraron errores semánticos:")
-                    for error_sem in errores_semanticos:
-                        print(f"  - {error_sem}")
-                        errores.append(f"SEMÁNTICO: {error_sem}")
-                else:
-                    print("DEBUG: ✅ Análisis semántico completado sin errores")
-            except Exception as e:
-                print(f"DEBUG: ❌ Error durante análisis semántico: {e}")
-        else:
-            print("DEBUG: ⚠️ Saltando análisis semántico - NO hay variables en tabla extendida")
+            if errores_semanticos:
+                print("DEBUG: Se encontraron errores semánticos:")
+                for error_sem in errores_semanticos:
+                    print(f"  - {error_sem}")
+                    errores.append(f"SEMÁNTICO: {error_sem}")
+        except Exception as e:
+            print(f"DEBUG: Error durante análisis semántico: {e}")
+            # errores.append(f"Error en análisis semántico: {e}")  # Comentado temporalmente
 
-        # 4) Mostrar contenido de la tabla para debug DESPUÉS del análisis semántico
-        print("DEBUG: ========== ESTADO FINAL DE LA TABLA ==========")
 
-        # Mostrar estructura extendida FINAL
-        if hasattr(self.tabla_simbolos, 'variables_extendidas'):
-            print(f"DEBUG: Variables extendidas FINALES: {len(self.tabla_simbolos.variables_extendidas)}")
-            for nombre, variable in self.tabla_simbolos.variables_extendidas.items():
-                print(f"  {nombre}: {variable.tipo_dato} - refs: {variable.contador_referencias}")
+        # 4) Mostrar contenido de la tabla para debug
+        print("DEBUG: Contenido de la tabla de símbolos:")
+        simbolos = self.tabla_simbolos.obtener_todos()
+        for i, simbolo in enumerate(simbolos):
+            print(f"  {i}: {simbolo}")
 
-        # 5) Ejecutar AST con intérprete (SIEMPRE ejecutar, sin importar errores semánticos)
+        if not simbolos:
+            print("(vacía)")
+
+        # 5) Ejecutar AST con intérprete
         salida_lines = []
 
         def output_callback(valor):
@@ -123,12 +103,11 @@ class AnalizadorSintactico:
                 funciones_registradas += 1
                 print(f"DEBUG: Función '{nombre}' registrada en intérprete")
 
-        print(f"DEBUG: Total funciones registradas: {funciones_registradas}")
-        print(f"DEBUG: Funciones disponibles: {list(interp.funciones.keys())}")
+        print(f" DEBUG: Total funciones registradas: {funciones_registradas}")
+        print(f" DEBUG: Funciones disponibles: {list(interp.funciones.keys())}")
 
         try:
             # Ejecutar solo sentencias globales
-            print("DEBUG: Ejecutando código con intérprete...")
             for nodo in ast:
                 if isinstance(nodo, dict) and nodo.get("nodo") not in ["FUNCION", "CLASE", "INTERFAZ"]:
                     print(f"DEBUG: Ejecutando nodo: {nodo.get('nodo')}")
@@ -142,10 +121,8 @@ class AnalizadorSintactico:
         if salida_lines:
             errores.append("SALIDA_INTERPRETE:")
             errores.extend(salida_lines)
+        
 
-        print("DEBUG: ========== RESUMEN DE ERRORES ==========")
-        for i in self.reporte_errores.errores:
-            print(f"error: {i}")
 
         return errores
 
@@ -155,6 +132,49 @@ class AnalizadorSintactico:
                 continue
 
             tipo_n = nodo.get("nodo")
+
+            """
+            # Solo procesar declaraciones de variables globales
+            if tipo_n == "DECL_VAR":
+                ident = nodo.get("id")
+                tipo_dato_token = nodo.get("tipo")
+
+                # Verificar si ya existe
+                if not self.tabla_simbolos.buscar(ident):
+                    simbolo = {
+                        "identificador": ident,
+                        "categoria": "variable",
+                        "tipo_dato": tipo_dato_token,
+                        "ambito": "Global",
+                        "direccion": self.tabla_simbolos.obtener_direccion(),
+                        "linea": nodo.get("linea", -1),
+                        "valor": self._valor_literal_de_nodo_simple(nodo.get("valor")),
+                        "estado": "declarado" if nodo.get("valor") is None else "inicializado",
+                        "estructura": None,
+                        "contador_referencias": 1
+                    }
+                    self.tabla_simbolos.insertar(simbolo)
+                    print(f"DEBUG: Insertada variable global: {ident}")
+
+            # También procesar asignaciones globales
+            elif tipo_n == "ASIGNACION":
+                ident = nodo.get("id")
+                if not self.tabla_simbolos.buscar(ident):
+                    simbolo = {
+                        "identificador": ident,
+                        "categoria": "variable",
+                        "tipo_dato": None,
+                        "ambito": "Global",
+                        "direccion": self.tabla_simbolos.obtener_direccion(),
+                        "linea": nodo.get("linea", -1),
+                        "valor": self._valor_literal_de_nodo_simple(nodo.get("valor")),
+                        "estado": "inicializado",
+                        "estructura": None,
+                        "contador_referencias": 1
+                    }
+                    self.tabla_simbolos.insertar(simbolo)
+                    print(f"DEBUG: Insertada variable por asignación: {ident}")
+        """
 
     def _valor_literal_de_nodo_simple(self, nodo_val):
         """

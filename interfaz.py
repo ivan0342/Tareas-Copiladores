@@ -7,31 +7,76 @@ from analizador_sintactico import AnalizadorSintactico
 from parser import Parser, ParserError
 
 
-class Interfaz:
 
+class Interfaz:
     def __init__(self):
         self.ventana = tk.Tk()
         self.ventana.title("Analizador Léxico")
-        self.ventana.geometry("1000x700")
+        self.ventana.geometry("1000x700")  # Un poco más ancha para los nuevos campos
 
-        # ✅ CREAR UNA SOLA INSTANCIA y compartirla
+        # Tabla de símbolos con desbordamiento
         self.tabla_simbolos = TablaSimbolos(capacidad_bytes=100, archivo_backup="tabla_overflow.json")
 
-        # ✅ PASAR LA MISMA INSTANCIA a ambos analizadores
+        # Analizador léxico con tabla de símbolos
         self.analizador = AnalizadorLexico(tabla_simbolos=self.tabla_simbolos)
         self.analizador_sintactico = AnalizadorSintactico(tabla_simbolos=self.tabla_simbolos)
 
+        # Analizador de optimizacion
+        self.visualizador = None
+
         self.crear_interfaz()
 
-        print(f"DEBUG_INTERFAZ: Tabla creada con ID: {id(self.tabla_simbolos)}")
+    # En interfaz.py, modifica el método mostrar_optimizaciones:
 
-    def _reset_selectivo_tabla(self):
-        """Reset selectivo que preserva referencias Y contadores"""
-        print("DEBUG: Realizando reset selectivo COMPLETO...")
+    def mostrar_optimizaciones(self):
+        """Muestra ventana de optimizaciones"""
+        print("🔍 DEBUG: Botón Ver Optimizaciones presionado")
 
-        # En lugar de reset selectivo, usar el reset mejorado de TablaSimbolos
-        self.tabla_simbolos.resetear()
+        # 🔥 VERIFICAR DE FORMA MÁS ROBUSTA
+        tiene_optimizador = (
+                hasattr(self.analizador_sintactico, 'optimizador_multinivel') and
+                self.analizador_sintactico.optimizador_multinivel is not None
+        )
 
+        print(f"🔍 DEBUG: ¿Tiene optimizador? {tiene_optimizador}")
+
+        if tiene_optimizador:
+            optimizador = self.analizador_sintactico.optimizador_multinivel
+            print(f"🔍 DEBUG: Optimizador: {optimizador}")
+            print(f"🔍 DEBUG: ¿Tiene AST antes? {hasattr(optimizador, 'ast_antes')}")
+            if hasattr(optimizador, 'ast_antes'):
+                print(f"🔍 DEBUG: AST antes: {optimizador.ast_antes is not None}")
+
+        if not tiene_optimizador:
+            messagebox.showinfo("Información",
+                                "Ejecuta la compilación primero para ver las optimizaciones.\n\n"
+                                "Asegúrate de que el código tenga estructuras optimizables (bucles, variables, etc.).")
+            return
+
+        optimizador = self.analizador_sintactico.optimizador_multinivel
+
+        if not hasattr(optimizador, 'ast_antes') or optimizador.ast_antes is None:
+            messagebox.showinfo("Información",
+                                "No hay datos de optimización disponibles.\n\n"
+                                "El código puede no tener estructuras optimizables o las optimizaciones no se aplicaron.")
+            return
+
+        if not self.visualizador:
+            try:
+                from visualizador_optimizacion import VisualizadorOptimizacion
+                self.visualizador = VisualizadorOptimizacion(optimizador)
+                print("🔍 DEBUG: Visualizador creado exitosamente")
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo crear el visualizador: {e}")
+                print(f"❌ ERROR creando visualizador: {e}")
+                return
+
+        try:
+            self.visualizador.mostrar_comparacion()
+            print("🔍 DEBUG: Ventana de optimizaciones mostrada")
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo mostrar la ventana: {e}")
+            print(f"❌ ERROR mostrando ventana: {e}")
 
     def crear_interfaz(self):
         frame_editor = ttk.LabelFrame(self.ventana, text="Editor de código")
@@ -45,6 +90,10 @@ class Interfaz:
 
         boton_tabla = ttk.Button(self.ventana, text="Ver tabla de símbolos", command=self.mostrar_tabla)
         boton_tabla.pack(pady=10)
+
+        boton_optimizaciones = ttk.Button(self.ventana, text="Ver Optimizaciones",
+                                          command=self.mostrar_optimizaciones)
+        boton_optimizaciones.pack(pady=5)
 
     def mostrar_resultados_errores(self, errores_lex, errores_sint, errores_semanticos):
         ventana_resultados = tk.Toplevel(self.ventana)
@@ -165,29 +214,37 @@ class Interfaz:
             messagebox.showinfo("Aviso", "No hay texto para analizar.")
             return
 
-        # ✅ VERIFICAR INSTANCIA ANTES de resetear
-        print(f"DEBUG_INTERFAZ: ID de tabla_simbolos antes de reset: {id(self.tabla_simbolos)}")
+        # 🔥 RESET COMPLETO antes de cada análisis
+        print("🔥 DEBUG: Iniciando nuevo análisis - Reseteando tabla...")
+        if hasattr(self.tabla_simbolos, 'resetear'):
+            self.tabla_simbolos.resetear()
+        else:
+            # Fallback
+            self.tabla_simbolos.memoria = []
+            self.tabla_simbolos.overflow = []
+            # 🔥 También limpiar estructuras extendidas si existen
+            if hasattr(self.tabla_simbolos, 'variables_extendidas'):
+                self.tabla_simbolos.variables_extendidas.clear()
+            if hasattr(self.tabla_simbolos, 'constantes_extendidas'):
+                self.tabla_simbolos.constantes_extendidas.clear()
 
-        # ✅ CORRECCIÓN: USAR RESET SELECTIVO en lugar del reset completo
-        #self._reset_selectivo_tabla()
-
-        print(f"DEBUG_INTERFAZ: ID de tabla_simbolos después de reset: {id(self.tabla_simbolos)}")
+        # 🔥 DEBUG: Verificar que está vacío
+        print("🔥 DEBUG: Estado después del reset:")
+        if hasattr(self.tabla_simbolos, 'variables_extendidas'):
+            print(f"  Variables extendidas: {len(self.tabla_simbolos.variables_extendidas)}")
+            print(f"  Constantes extendidas: {len(self.tabla_simbolos.constantes_extendidas)}")
 
         tokens, errores_lex = self.analizador.tokenize(texto)
-
-        # ✅ VERIFICAR que el analizador sintáctico usa la misma tabla
-        print(f"DEBUG_INTERFAZ: ID de tabla en analizador_sintactico: {id(self.analizador_sintactico.tabla_simbolos)}")
-
         errores_sint = self.analizador_sintactico.analizar(tokens)
-        errores_semanticos = self.analizador_sintactico.reporte_errores.errores
 
-        # ✅ VERIFICAR ESTADO FINAL de la tabla
-        print("DEBUG_INTERFAZ: === ESTADO FINAL DE LA TABLA EN INTERFAZ ===")
+        # 🔥 DEBUG: Ver estado después del análisis
+        print("🔥 DEBUG: Estado después del análisis:")
         if hasattr(self.tabla_simbolos, 'variables_extendidas'):
             for nombre, variable in self.tabla_simbolos.variables_extendidas.items():
                 print(f"  {nombre}: {variable.contador_referencias} referencias")
 
-        # Mostrar ventanas automáticamente
+        errores_semanticos = self.analizador_sintactico.reporte_errores.errores
+
         self.mostrar_resultados_errores(errores_lex, errores_sint, errores_semanticos)
         self.mostrar_tabla_tokens(tokens)
         self.mostrar_tabla()
@@ -196,12 +253,6 @@ class Interfaz:
         if not self.tabla_simbolos:
             messagebox.showinfo("Aviso", "No hay tabla de símbolos disponible.")
             return
-
-        # ✅ VERIFICACIÓN ANTES de mostrar
-        print("DEBUG_MOSTRAR_TABLA: ========== VERIFICACIÓN ANTES DE MOSTRAR ==========")
-        if hasattr(self.tabla_simbolos, 'variables_extendidas'):
-            for nombre, variable in self.tabla_simbolos.variables_extendidas.items():
-                print(f"DEBUG_MOSTRAR_TABLA: '{nombre}': {variable.contador_referencias} referencias")
 
         ventana_tabla = tk.Toplevel(self.ventana)
         ventana_tabla.title("Tabla de Símbolos - Información Extendida")
@@ -284,60 +335,54 @@ class Interfaz:
         texto_opt.config(state="disabled")
 
     def _poblar_tabla_extendida(self, tabla):
-        """Pobla la tabla con datos de la estructura extendida CORREGIDO"""
-        # LIMPIAR tabla primero
-        for item in tabla.get_children():
-            tabla.delete(item)
+        """Pobla la tabla con datos de la estructura extendida"""
+        # USAR SOLO LA ESTRUCTURA EXTENDIDA
 
-        print(f"DEBUG_POBLAR: Poblando tabla desde estructura extendida...")
+        # Variables normales
+        for nombre, variable in self.tabla_simbolos.variables_extendidas.items():
+            tabla.insert("", tk.END, values=(
+                nombre,
+                "variable",
+                variable.tipo_dato,
+                variable.linea_declaracion,
+                variable.ambito,
+                variable.direccion_relativa or "N/A",
+                variable.valor,
+                variable.estado,
+                "-",
+                variable.contador_referencias,
+                # NUEVOS CAMPOS:
+                variable.tamanio_bytes,
+                "No",  # No es constante
+                "Sí",  # Modificable
+                variable.contador_referencias,
+                "Sí" if variable.vivo else "No"
+            ))
 
-        # ✅ USAR SOLO LA ESTRUCTURA EXTENDIDA
-        if hasattr(self.tabla_simbolos, 'variables_extendidas'):
-            for nombre, variable in self.tabla_simbolos.variables_extendidas.items():
-                tabla.insert("", tk.END, values=(
-                    nombre,
-                    "variable",
-                    variable.tipo_dato,
-                    variable.linea_declaracion,
-                    variable.ambito,
-                    variable.direccion_relativa or "N/A",
-                    variable.valor,
-                    variable.estado,
-                    "-",
-                    variable.contador_referencias,  # 🔥 ESTE ES EL VALOR CORRECTO
-                    # NUEVOS CAMPOS:
-                    variable.tamanio_bytes,
-                    "No",  # No es constante
-                    "Sí",  # Modificable
-                    variable.contador_referencias,  # 🔥 Mismo valor para referencia
-                    "Sí" if variable.vivo else "No"
-                ))
-                print(f"DEBUG_POBLAR: Insertada variable '{nombre}' con {variable.contador_referencias} referencias")
+        # Constantes
+        for nombre, constante in self.tabla_simbolos.constantes_extendidas.items():
+            tabla.insert("", tk.END, values=(
+                nombre,
+                "constante",
+                constante.tipo_dato,
+                constante.linea_declaracion,
+                constante.ambito,
+                constante.direccion_relativa or "N/A",
+                constante.valor,
+                constante.estado,
+                "-",
+                constante.contador_referencias,
+                # NUEVOS CAMPOS:
+                constante.tamanio_bytes,
+                "Sí",  # Es constante
+                "No",  # No modificable
+                constante.contador_referencias,
+                "Sí" if constante.vivo else "No"
+            ))
 
-        if hasattr(self.tabla_simbolos, 'constantes_extendidas'):
-            for nombre, constante in self.tabla_simbolos.constantes_extendidas.items():
-                tabla.insert("", tk.END, values=(
-                    nombre,
-                    "constante",
-                    constante.tipo_dato,
-                    constante.linea_declaracion,
-                    constante.ambito,
-                    constante.direccion_relativa or "N/A",
-                    constante.valor,
-                    constante.estado,
-                    "-",
-                    constante.contador_referencias,  # 🔥 ESTE ES EL VALOR CORRECTO
-                    # NUEVOS CAMPOS:
-                    constante.tamanio_bytes,
-                    "Sí",  # Es constante
-                    "No",  # No modificable
-                    constante.contador_referencias,  # 🔥 Mismo valor para referencia
-                    "Sí" if constante.vivo else "No"
-                ))
-                print(f"DEBUG_POBLAR: Insertada constante '{nombre}' con {constante.contador_referencias} referencias")
-
+        # ✅ IGNORAR COMPLETAMENTE LA ESTRUCTURA ANTIGUA
         print(
-            f"DEBUG_POBLAR: Tabla poblada con {len(self.tabla_simbolos.variables_extendidas)} variables y {len(self.tabla_simbolos.constantes_extendidas)} constantes")
+            f"DEBUG: Tabla poblada con {len(self.tabla_simbolos.variables_extendidas)} variables y {len(self.tabla_simbolos.constantes_extendidas)} constantes")
 
     def _generar_estadisticas(self):
         """Genera estadísticas de la tabla de símbolos"""
@@ -374,57 +419,38 @@ class Interfaz:
         """Genera análisis para optimización CORREGIDO"""
         analisis_text = "=== ANÁLISIS PARA OPTIMIZACIÓN ===\n\n"
 
-        # ✅ VERIFICACIÓN DIRECTA de la estructura extendida
-        analisis_text += "🔍 CONTADORES REALES EN ESTRUCTURA EXTENDIDA:\n"
+        # ✅ DEBUG DETALLADO: Mostrar contadores actuales CORREGIDO
+        analisis_text += "🔍 CONTADORES DE REFERENCIAS ACTUALES:\n"
 
-        if hasattr(self.tabla_simbolos, 'variables_extendidas'):
-            for nombre, variable in self.tabla_simbolos.variables_extendidas.items():
-                analisis_text += f"  • {nombre}: {variable.contador_referencias} referencias\n"
-        else:
-            analisis_text += "  ❌ NO existe estructura variables_extendidas\n"
-
-        analisis_text += "\n"
-
-        # ✅ USAR LOS DATOS REALES de la estructura extendida
-        analisis_text += "📊 CONTADORES DE REFERENCIAS REALES:\n"
-
-        # Variables normales - MOSTRAR VALORES REALES
-        if hasattr(self.tabla_simbolos, 'variables_extendidas'):
-            for nombre, variable in self.tabla_simbolos.variables_extendidas.items():
-                analisis_text += f"  • {nombre}: {variable.contador_referencias} referencias\n"
-        else:
-            analisis_text += "  ❌ No se puede acceder a variables_extendidas\n"
+        # Variables normales - CORREGIDO: Usar estructura extendida
+        for nombre, variable in self.tabla_simbolos.variables_extendidas.items():
+            analisis_text += f"  • {nombre}: {variable.contador_referencias} referencias\n"
 
         # Constantes
-        if hasattr(self.tabla_simbolos, 'constantes_extendidas'):
-            for nombre, constante in self.tabla_simbolos.constantes_extendidas.items():
-                analisis_text += f"  • {nombre} (constante): {constante.contador_referencias} referencias\n"
+        for nombre, constante in self.tabla_simbolos.constantes_extendidas.items():
+            analisis_text += f"  • {nombre} (constante): {constante.contador_referencias} referencias\n"
 
         analisis_text += "\n"
 
-        # Variables no utilizadas (basado en contador == 0)
+        # Variables no utilizadas (basado en contador == 0) - CORREGIDO
         no_utilizadas = []
-        if hasattr(self.tabla_simbolos, 'variables_extendidas'):
-            for nombre, variable in self.tabla_simbolos.variables_extendidas.items():
-                if variable.contador_referencias == 0:
-                    no_utilizadas.append(nombre)
+        for nombre, variable in self.tabla_simbolos.variables_extendidas.items():
+            if variable.contador_referencias == 0:
+                no_utilizadas.append(nombre)
 
         analisis_text += f"🚫 VARIABLES NO UTILIZADAS: {len(no_utilizadas)}\n"
         if no_utilizadas:
             for var in no_utilizadas:
                 info = self.tabla_simbolos.variables_extendidas.get(var)
                 if info:
-                    analisis_text += f"  • {var} - {info.tipo_dato} ({info.tamanio_bytes} bytes) - refs: {info.contador_referencias}\n"
+                    analisis_text += f"  • {var} - {info.tipo_dato} ({info.tamanio_bytes} bytes)\n"
         else:
             analisis_text += "  ✓ No hay variables no utilizadas\n"
 
         analisis_text += "\n"
 
         # Variables muertas
-        muertas = []
-        if hasattr(self.tabla_simbolos, 'obtener_variables_muertas_extendidas'):
-            muertas = self.tabla_simbolos.obtener_variables_muertas_extendidas()
-
+        muertas = self.tabla_simbolos.obtener_variables_muertas_extendidas()
         analisis_text += f"💀 VARIABLES MUERTAS: {len(muertas)}\n"
         if muertas:
             for var in muertas:
@@ -441,10 +467,9 @@ class Interfaz:
         if muertas:
             analisis_text += "• Reutilizar variables muertas para optimizar memoria\n"
 
-        if hasattr(self.tabla_simbolos, 'obtener_uso_memoria_extendido'):
-            uso_memoria = self.tabla_simbolos.obtener_uso_memoria_extendido()
-            if float(uso_memoria['porcentaje_uso'].replace('%', '')) > 70:
-                analisis_text += "• Alto uso de memoria - considerar optimización\n"
+        uso_memoria = self.tabla_simbolos.obtener_uso_memoria_extendido()
+        if float(uso_memoria['porcentaje_uso'].replace('%', '')) > 70:
+            analisis_text += "• Alto uso de memoria - considerar optimización\n"
 
         if not no_utilizadas and not muertas:
             analisis_text += "• El código está bien optimizado en términos de uso de variables\n"

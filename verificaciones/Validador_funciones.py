@@ -8,12 +8,11 @@ class ValidadorFunciones:
         self.errores = []
         self.reporte = reporte_errores
     
-    def validar_declaracion_funcion(self, nodo_funcion):
+    def validar_declaracion_funcion(self, nodo_funcion, linea):
         """Valida la declaración de una función - SOLO VALIDA, NO INSERTA"""
         nombre = nodo_funcion.get('nombre')
         parametros = nodo_funcion.get('params', [])
         tipo_retorno = nodo_funcion.get('tipo', 'TIPO_VACIO')
-        linea = nodo_funcion.get('linea', 0)
         
         if not nombre:
             return False
@@ -43,11 +42,10 @@ class ValidadorFunciones:
         return True
 
     
-    def validar_llamada_funcion(self, nodo_llamada):
+    def validar_llamada_funcion(self, nodo_llamada, linea):
         """Valida una llamada a función"""
         nombre_funcion = nodo_llamada.get('id')
         argumentos = nodo_llamada.get('args', [])
-        linea = nodo_llamada.get('linea', 0)
         
         # Buscar la función
 
@@ -77,7 +75,8 @@ class ValidadorFunciones:
         
         return len(self.errores) == 0
     
-    def validar_retorno(self, nodo_retorno, tipo_funcion_actual):
+    def validar_retorno(self, nodo_retorno, tipo_funcion_actual, linea):
+        print("🔥 DEBUG_RETORNO: Validando retorno...")
         """Valida una sentencia return"""
         # 🔥 NORMALIZAR TIPO DE FUNCIÓN
         tipo_funcion_normalizado = self.verificador_tipos.normalizar_tipo(tipo_funcion_actual)
@@ -85,7 +84,6 @@ class ValidadorFunciones:
         valor_retorno = nodo_retorno.get('valor')
         
         if tipo_funcion_normalizado == 'TIPO_VACIO' and valor_retorno is not None:
-            linea = nodo_retorno.get('linea', 0)
             self.errores.append(f"Línea {linea}: Función void no puede retornar un valor")
             self.reporte.agregar_error(CategoriaError.FUNCION, f"Función void no puede retornar un valor", linea)
             print(f"🔥 ERROR: Función void no puede retornar un valor en línea {linea}")
@@ -106,5 +104,32 @@ class ValidadorFunciones:
                 self.reporte.agregar_error(CategoriaError.TIPO, f"Tipo de retorno incompatible. Esperado: {tipo_funcion_normalizado}, obtenido: {tipo_retorno}", linea)
                 print(f"🔥 ERROR: Tipo de retorno incompatible en línea {linea}. Esperado: {tipo_funcion_normalizado}, obtenido: {tipo_retorno}")
                 return False
+        
+    
+    def comprobar_si_hay_retorno(self, nodo, linea):
+        cuerpo = nodo.get("cuerpo")
+        if nodo.get("tipo") in {"entero", "booleano", "cadena", "flotante", "caracter"}:
+            tiene_return = False
+            for stmt in cuerpo.get("sentencias", []):
+                if stmt.get("nodo") == "RETORNAR":
+                    tiene_return = True
+                    break
+
+            if not tiene_return:
+                self.reporte.agregar_error(CategoriaError.FUNCION,
+                                           f"La función '{nodo.get('nombre')}' debe tener una sentencia retornar",
+                                           linea)
+                print(f"🔥 ERROR: La función '{nodo.get('nombre')}' debe tener una sentencia return en línea {linea}")
+    
+        if nodo.get("tipo") == "vacio":
+            for stmt in cuerpo.get("sentencias", []):
+                if stmt.get("nodo") == "RETORNAR":
+                    tiene_return = True
+                    break
+
+            if tiene_return:
+                self.reporte.agregar_error(CategoriaError.FUNCION,
+                                           f"La función vacia '{nodo.get('nombre')}' no debe tener una sentencia retornar con valor",
+                                           linea)
         
         return True

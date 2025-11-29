@@ -174,46 +174,27 @@ class TablaSimbolos:
         self.grafo_referencias = {}
 
     def resetear(self):
-        """Reinicia la tabla de símbolos PERO preserva contadores de referencias"""
-        print("DEBUG: Realizando reset selectivo - PRESERVANDO contadores")
+        """Reinicia la tabla COMPLETAMENTE para nuevo análisis"""
+        print("🔥 DEBUG: Realizando reset COMPLETO de la tabla")
 
         # ========== ESTRUCTURA ANTIGUA ==========
         self.memoria = []
         self.overflow = []
         self.direccion_actual = 0
-        # NO resetear: self.contador_direccion (para mantener direcciones únicas)
+        self.contador_direccion = 0  # 🔥 IMPORTANTE: Resetear este también
         self.pila_ambitos = ["Global"]
         self.errores_semanticos = []
         self.simbolos_por_ambito = {"Global": []}
 
         # ========== ESTRUCTURA NUEVA EXTENDIDA ==========
-        # 🔥 CORRECCIÓN CRÍTICA: PRESERVAR contadores de referencias
-        # Solo limpiar valores temporales, NO los contadores
+        # 🔥 LIMPIAR COMPLETAMENTE las estructuras extendidas
+        self.variables_extendidas.clear()
+        self.constantes_extendidas.clear()
+        self.funciones_extendidas.clear()
+        self.clases_extendidas.clear()
+        self.grafo_referencias.clear()
 
-        # Para variables extendidas
-        for nombre, variable in self.variables_extendidas.items():
-            # Preservar el contador de referencias
-            contador_actual = variable.contador_referencias
-            # Resetear otros campos
-            variable.valor = None
-            variable.estado = "declarada"
-            variable.vivo = True
-            # 🔥 RESTAURAR el contador preservado
-            variable.contador_referencias = contador_actual
-            print(f"DEBUG: Variable '{nombre}' - contador preservado: {contador_actual}")
-
-        # Para constantes extendidas
-        for nombre, constante in self.constantes_extendidas.items():
-            contador_actual = constante.contador_referencias
-            constante.valor = None
-            constante.estado = "declarada"
-            constante.contador_referencias = contador_actual
-            print(f"DEBUG: Constante '{nombre}' - contador preservado: {contador_actual}")
-
-        # Resetear otras estructuras que no afectan contadores
-        self.grafo_referencias = {}
-
-        print("DEBUG: Reset selectivo completado - contadores PRESERVADOS")
+        print("🔥 DEBUG: Reset COMPLETO realizado - todas las estructuras limpiadas")
 
     # ========== MÉTODOS ANTIGUOS (COMPATIBILIDAD CON PARSER ACTUAL) ==========
 
@@ -267,9 +248,41 @@ class TablaSimbolos:
         self.simbolos_por_ambito[ambito_actual].append(simbolo)
 
         # ========== NUEVO: También insertar en estructura extendida ==========
-        self._insertar_en_estructura_extendida(simbolo)
+        self._sincronizar_con_estructura_extendida(simbolo)
 
         return True
+
+    def _sincronizar_con_estructura_extendida(self, simbolo):
+        """Sincroniza símbolo antiguo con estructura extendida - CORREGIDO"""
+        nombre = simbolo.get("identificador")
+        categoria = simbolo.get("categoria")
+        tipo_dato = simbolo.get("tipo_dato")
+        linea = simbolo.get("linea", 0)
+        valor = simbolo.get("valor")
+        ambito = simbolo.get("ambito", "Global")
+
+        if categoria == "variable":
+            # 🔥 Si YA EXISTE, solo actualizar campos PERO PRESERVAR CONTADOR
+            if nombre in self.variables_extendidas:
+                existing_var = self.variables_extendidas[nombre]
+                contador_preservado = existing_var.contador_referencias
+                existing_var.tipo_dato = tipo_dato
+                existing_var.valor = valor
+                existing_var.estado = simbolo.get("estado", "declarada")
+                existing_var.ambito = ambito
+                # 🔥 MANTENER el contador existente
+                existing_var.contador_referencias = contador_preservado
+                print(
+                    f"🔥 DEBUG: Sincronizada variable existente '{nombre}', contador PRESERVADO: {contador_preservado}")
+            else:
+                # Crear nueva solo si no existe
+                info_var = InformacionVariable(tipo_dato, ambito, linea)
+                info_var.valor = valor
+                info_var.direccion_relativa = simbolo.get("direccion")
+                info_var.estado = simbolo.get("estado", "declarada")
+                info_var.contador_referencias = 0  # Nueva variable empieza en 0
+                self.variables_extendidas[nombre] = info_var
+                print(f"🔥 DEBUG: Creada nueva variable sincronizada '{nombre}' con contador: 0")
 
     def _insertar_en_estructura_extendida(self, simbolo):
         """Inserta el símbolo en la nueva estructura extendida"""
@@ -403,42 +416,38 @@ class TablaSimbolos:
 
     def insertar_variable_extendida(self, nombre: str, tipo_dato: str, linea: int,
                                     es_constante: bool = False, valor=None) -> bool:
-        """NUEVO MÉTODO - Insertar variable en estructura extendida CORREGIDO"""
-        if self.buscar_variable_extendida_ambito_actual(nombre):
-            self.errores_semanticos.append(f"Variable '{nombre}' ya declarada en ámbito actual")
-            return False
+        """MÉTODO MANTENIDO SOLO PARA COMPATIBILIDAD - NO USAR"""
+        print(f"🔥 ADVERTENCIA: insertar_variable_extendida llamado para '{nombre}' - USAR insertar() EN SU LUGAR")
 
-        ambito = self.ambito_actual()
-        variable = InformacionVariable(tipo_dato, ambito, linea)
-        variable.es_constante = es_constante
-        variable.valor = valor
-        variable.direccion_relativa = self._asignar_direccion_extendida(variable.tamanio_bytes)
-
-        # CORRECCIÓN: Inicializar contador explícitamente
-        variable.contador_referencias = 0
-
-        if es_constante:
-            self.constantes_extendidas[nombre] = variable
-        else:
-            self.variables_extendidas[nombre] = variable
-
-        self._actualizar_grafo_referencias(nombre, "declaracion")
-        return True
+        # Simplemente delegar a insertar() para mantener compatibilidad
+        simbolo = {
+            "identificador": nombre,
+            "categoria": "constante" if es_constante else "variable",
+            "tipo_dato": tipo_dato,
+            "linea": linea,
+            "valor": valor
+        }
+        return self.insertar(simbolo)
 
     def buscar_variable_extendida(self, nombre: str) -> Optional[InformacionVariable]:
-        """NUEVO MÉTODO - Buscar variable en estructura extendida"""
+        """Buscar variable en estructura extendida - CORREGIDO"""
         # Buscar en ámbito actual y padres
         for ambito in reversed(self.pila_ambitos):
+            # Buscar en variables
             for var_nombre, variable in self.variables_extendidas.items():
                 if var_nombre == nombre and variable.ambito == ambito:
-                    variable.contador_referencias += 1
+                    print(
+                        f"🔥 DEBUG: Encontrada variable '{nombre}' en ámbito '{ambito}' con contador: {variable.contador_referencias}")
                     return variable
 
+            # Buscar en constantes
             for const_nombre, constante in self.constantes_extendidas.items():
                 if const_nombre == nombre and constante.ambito == ambito:
-                    constante.contador_referencias += 1
+                    print(
+                        f"🔥 DEBUG: Encontrada constante '{nombre}' en ámbito '{ambito}' con contador: {constante.contador_referencias}")
                     return constante
 
+        print(f"🔥 DEBUG: Variable '{nombre}' NO encontrada en ningún ámbito")
         return None
 
     def buscar_variable_extendida_ambito_actual(self, nombre: str) -> Optional[InformacionVariable]:

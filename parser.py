@@ -1,6 +1,7 @@
 #parser.py
 from tabla_simbolos import TablaSimbolos
 from verificaciones.clasificacion_errores import CategoriaError, ReporteErrores
+from verificaciones.verificadot_tipos import VerificadorTipos
 class ParserError(Exception):
     pass
 
@@ -12,6 +13,7 @@ class Parser:
         self.tabla_simbolos = tabla_simbolos
         self.ast = []  # árbol sintáctico abstracto
         self.reporte = reporte_errores
+        self.verificador_tipos = VerificadorTipos(tabla_simbolos, reporte_errores)
 
     def error(self, mensaje):
         tok = self.actual()
@@ -53,7 +55,7 @@ class Parser:
         return self.tokens[self.i]["tipo"] == tipo_esperado
 
     def parse(self):
-        while self.actual()["tipo"] != "EOF":
+        while self.actual()["tipo"] != "EOF":            
             try:
                 nodo = self.declaracion_o_sentencia()
                 if nodo:
@@ -233,6 +235,8 @@ class Parser:
         return {"nodo": "USAR", "biblioteca": nombre}
 
     def declaracion_constante(self):
+        print("DEBUG: Procesando declaración de constante")
+        
         self.match("CONSTANTE")
         tipo_token = self.match(self.actual()["tipo"])
         tipo = tipo_token["token"]
@@ -243,6 +247,7 @@ class Parser:
 
         print(f"DEBUG: Procesando constante '{nombre}' = {valor}")
 
+        
         # CORREGIR: Usar insertar_variable_extendida para constante
         if hasattr(self.tabla_simbolos, 'insertar_variable_extendida'):
             # Extraer valor literal
@@ -265,28 +270,28 @@ class Parser:
                 print(f"DEBUG: Constante '{nombre}' en constantes_extendidas: {const_verificada}")
                 if const_verificada:
                     print(f"DEBUG: Valor almacenado: {self.tabla_simbolos.constantes_extendidas[nombre].valor}")
-        else:
-            # Método antiguo como fallback
-            simbolo = {
-                "identificador": nombre,
-                "categoria": "constante",
-                "tipo_dato": tipo,
-                "linea": self.actual()["linea"],
-                "ambito": "Global",
-                "direccion": self.tabla_simbolos.obtener_direccion(),
-                "valor": valor,
-                "estado": "inicializado",
-                "estructura": "-",
-                "contador_referencias": 1
+        
+        simbolo = {
+            "identificador": nombre,
+            "categoria": "constante",  # 🔥 Esto es crucial
+            "tipo_dato": tipo,
+            "linea": self.actual()["linea"],
+            "ambito": "Global",
+            "direccion": self.tabla_simbolos.obtener_direccion(),
+            "valor": valor,
+            "estado": "inicializado",
+            "estructura": "-",
+            "contador_referencias": 1,
             }
-            self.tabla_simbolos.insertar(simbolo)
-            print(f"DEBUG: Constante '{nombre}' insertada en tabla antigua")
+        self.tabla_simbolos.insertar(simbolo)
+        print(f"DEBUG: Constante '{nombre}' insertada en tabla antigua")
 
-        return {"nodo": "CONSTANTE", "tipo": tipo, "id": nombre, "valor": valor}
+        return {"nodo": "CONSTANTE", "tipo": tipo, "id": nombre, "valor": valor, "linea": self.actual()["linea"]}
 
     # -------------------------------------------------------
 
     def asignacion_o_llamada(self):
+        print("ENTREEEE A ASIGNACION O LLAMADA");
         nombre = self.match("IDENTIFICADOR")["token"]
         linea = self.actual()["linea"]
 
@@ -365,7 +370,6 @@ class Parser:
     # -------------------------------------------------------
     # DECLARACIÓN DE VARIABLES
     # -------------------------------------------------------
-
     def declaracion_variable(self):
         tipo_token = self.match(self.actual()["tipo"])
         tipo = tipo_token["token"] if tipo_token else "desconocido"
@@ -387,28 +391,6 @@ class Parser:
         # Si hay identificador, seguimos normalmente
         nombre = self.match("IDENTIFICADOR")["token"]
         valor = None
-
-        # 🔥 CORRECCIÓN: Si la variable ya existe, NO insertar de nuevo
-        if nombre and "desconocido" not in tipo:
-            if hasattr(self.tabla_simbolos, 'insertar_variable_extendida'):
-                # Verificar si ya existe
-                variable_existente = self.tabla_simbolos.buscar_variable_extendida_ambito_actual(nombre)
-                if not variable_existente:
-                    # Solo insertar si NO existe
-                    valor_literal = self._obtener_valor_literal(valor) if valor else None
-                    success = self.tabla_simbolos.insertar_variable_extendida(
-                        nombre, tipo, linea,
-                        es_constante=False,
-                        valor=valor_literal
-                    )
-                    print(f"DEBUG: Insertada variable extendida '{nombre}': {success}")
-                else:
-                    # 🔥 Si ya existe, solo actualizar el valor pero MANTENER el contador
-                    print(f"DEBUG: Variable '{nombre}' ya existe - contador: {variable_existente.contador_referencias}")
-                    # Actualizar valor si es necesario
-                    if valor:
-                        valor_literal = self._obtener_valor_literal(valor)
-                        variable_existente.valor = valor_literal
 
         # Si hay signo de asignación, procesar la expresión
         if self.actual()["tipo"] == "ASIGNACION":
@@ -449,41 +431,24 @@ class Parser:
         if self.check("PUNTO_Y_COMA"):
             self.match("PUNTO_Y_COMA")
 
-        # SOLUCIÓN: Usar insertar_variable_extendida para variables también
         if nombre and "desconocido" not in tipo:
-            if hasattr(self.tabla_simbolos, 'insertar_variable_extendida'):
-                # Usar el nuevo método extendido
-                valor_literal = self._obtener_valor_literal(valor) if valor else None
-
-                # 🔥 CORRECCIÓN: Verificar si ya existe antes de insertar
-                variable_existente = self.tabla_simbolos.buscar_variable_extendida_ambito_actual(nombre)
-                if not variable_existente:
-                    success = self.tabla_simbolos.insertar_variable_extendida(
-                        nombre, tipo, linea,
-                        es_constante=False,  # ← Esto es variable, no constante
-                        valor=valor_literal
-                    )
-                    print(f"DEBUG: Insertada variable extendida '{nombre}': {success}")
-                else:
-                    print(f"DEBUG: Variable '{nombre}' ya existe en ámbito actual")
-            else:
-                # Fallback al método antiguo
-                simbolo = {
-                    "identificador": nombre,
-                    "categoria": "variable",
-                    "tipo_dato": tipo,
-                    "linea": linea,
-                    "ambito": "Global",
-                    "direccion": self.tabla_simbolos.obtener_direccion(),
-                    "valor": self._obtener_valor_literal(valor) if valor else None,
-                    "estado": "inicializado" if valor else "declarado",
-                    "estructura": "-",
-                    "contador_referencias": 1
-                }
-                try:
-                    self.tabla_simbolos.insertar(simbolo)
-                except Exception as e:
-                    print(f"Error al insertar símbolo {nombre}: {e}")
+            simbolo = {
+                "identificador": nombre,
+                "categoria": "variable",
+                "tipo_dato": tipo,
+                "linea": linea,
+                "ambito": "Global",
+                "direccion": self.tabla_simbolos.obtener_direccion(),
+                "valor": self._obtener_valor_literal(valor) if valor else None,
+                "estado": "inicializado" if valor else "declarado",
+                "estructura": "-",
+                "contador_referencias": 0  # 🔥 Iniciar en 0, se incrementará después
+            }
+            try:
+                self.tabla_simbolos.insertar(simbolo)
+                print(f"🔥 DEBUG: Variable '{nombre}' insertada via insertar()")
+            except Exception as e:
+                print(f"Error al insertar símbolo {nombre}: {e}")
 
         return {"nodo": "DECL_VAR", "tipo": tipo, "id": nombre, "valor": valor, "linea": linea}
 
@@ -733,7 +698,8 @@ class Parser:
             rhs = self.exp_mul()
             nodo = {"nodo": "BIN_OP", "op": op["tipo"], "izq": nodo, "der": rhs}
 
-            #._incrementar_referencias_en_expresion(nodo)
+            # CORREGIR: Incrementar contadores de variables en expresiones binarias
+            #self._incrementar_referencias_en_expresion(nodo)
 
         return nodo
 
@@ -799,11 +765,11 @@ class Parser:
             self.match("IDENTIFICADOR")
 
             # ✅ INCREMENTAR CONTADOR DE REFERENCIAS
-            #if hasattr(self.tabla_simbolos, 'buscar_variable_extendida'):
-            #    variable = self.tabla_simbolos.buscar_variable_extendida(nombre)
-            #    if variable:
-            #        variable.contador_referencias += 1
-            #        print(f"DEBUG: Referencia a '{nombre}' - contador: {variable.contador_referencias}")
+            if hasattr(self.tabla_simbolos, 'buscar_variable_extendida'):
+                variable = self.tabla_simbolos.buscar_variable_extendida(nombre)
+                if variable:
+                    variable.contador_referencias += 1
+                    print(f"DEBUG: Referencia a '{nombre}' - contador: {variable.contador_referencias}")
 
             # Si sigue un paréntesis, es una llamada a función
             if self.check("PAREN_IZQ"):
@@ -854,23 +820,44 @@ class Parser:
         if not isinstance(nodo, dict):
             return
 
-        # ✅ EVITAR PROCESAMIENTO DUPLICADO desde el inicio
-        if nodo.get('_referencia_procesada'):
-            return
-
         tipo_nodo = nodo.get("nodo")
+        print(f"DEBUG: Procesando nodo: {tipo_nodo}")
+        print("nodo completo:  ", nodo)
 
-        # Si es una variable, incrementar contador SOLO UNA VEZ
+        if nodo.get("nodo") == "BIN_OP":
+            lado_izq = nodo.get("izq")
+            lado_izq = lado_izq.get("nodo")
+            lado_der= nodo.get("der")
+            lado_der= lado_der.get("nodo")
+            self.verificador_tipos.verificar_compatibilidad(lado_izq, lado_der, nodo.get("op"), self.actual()['linea'])
+
+          # Si es una variable, incrementar contador
         if tipo_nodo == "VAR":
             nombre = nodo.get("id")
-            if hasattr(self.tabla_simbolos, 'buscar_variable_extendida'):
+            #en el caso de que la variable sea un parametro local, no se incrementa el contador
+            if self.tabla_simbolos.buscar(nombre) :
+                posibleParametro = self.tabla_simbolos.buscar(nombre)
+                print("posible parametro: ", posibleParametro.get("categoria"))
+                if posibleParametro.get("categoria") == "parametro" and posibleParametro.get("estado") != "declarado":
+                    print(f"DEBUG: La variable '{nombre}' es un parámetro local, no se incrementa el contador.")
+                    pass# No incrementar contador para parámetros locales
+
+            elif hasattr(self.tabla_simbolos, 'buscar_variable_extendida'):
                 variable = self.tabla_simbolos.buscar_variable_extendida(nombre)
                 if variable:
-                    # ✅ EVITAR duplicación: solo incrementar si no se ha hecho antes en este nodo
-                    if not nodo.get('_referencia_procesada'):
-                        variable.contador_referencias += 1
-                        nodo['_referencia_procesada'] = True  # Marcar como procesado
-                        print(f"DEBUG: ✅ Referencia a '{nombre}' - contador: {variable.contador_referencias}")
+                    #variable.contador_referencias += 1
+                    print(f"DEBUG: ✅ Referencia a '{nombre}' - contador: {variable.contador_referencias}")
+
+                    # CORRECCIÓN: Sincronizar con estructura antigua
+                    #simbolo_antiguo = self.tabla_simbolos.buscar(nombre)
+                    #if simbolo_antiguo:
+                    #    if "contador_referencias" not in simbolo_antiguo:
+                    #        simbolo_antiguo["contador_referencias"] = 0
+                    #    simbolo_antiguo["contador_referencias"] += 1
+                else:
+                    print(f"DEBUG: Variable '{nombre}' no encontrada en tabla extendida")
+                    print("hola")
+                    self.reporte.agregar_error(CategoriaError.DECLARACION, f"Variable '{nombre}' no declarada", self.actual()['linea'])
 
         elif tipo_nodo == "LLAMADA_FUNCION":
             nombre_funcion = nodo.get("id")
@@ -881,14 +868,9 @@ class Parser:
                 funcion = self.tabla_simbolos.buscar(nombre_funcion)
                 if not funcion or funcion.get('categoria') != 'funcion':
                     print(f"DEBUG:  Función '{nombre_funcion}' no encontrada en tabla de símbolos")
-                    self.reporte.agregar_error(CategoriaError.DECLARACION, f"Función '{nombre_funcion}' no declarada",
-                                               nodo.get("linea", 0))
+                    self.reporte.agregar_error(CategoriaError.DECLARACION, f"Función '{nombre_funcion}' no declarada", self.actual()['linea'])
                 else:
                     print(f"DEBUG:  Función '{nombre_funcion}' encontrada en tabla de símbolos")
-
-        # ✅ MARCAR ESTE NODO como procesado para evitar que se procese nuevamente
-        nodo['_referencia_procesada'] = True
-
         # Procesar recursivamente subexpresiones
         if "izq" in nodo:
             self._procesar_referencias_en_expresion(nodo["izq"])
@@ -1034,7 +1016,7 @@ class Parser:
 
         self.match("PAREN_DER")
 
-        # 🔥 CORRECCIÓN: Insertar función SOLO UNA VEZ
+        # CORRECCIÓN: Insertar función SOLO UNA VEZ
         # Verificar si ya existe antes de insertar
         funcion_existente = self.tabla_simbolos.buscar(nombre)
         if not funcion_existente:
@@ -1047,6 +1029,7 @@ class Parser:
                 "ambito": "Global",
                 "direccion": self.tabla_simbolos.obtener_direccion(),
                 "valor": None,
+                "retornar": True,
                 "estado": "declarada",
                 "estructura": "Funcion",
                 "contador_referencias": 0
@@ -1072,6 +1055,7 @@ class Parser:
                     "ambito": self.tabla_simbolos.ambito_actual(),
                     "direccion": self.tabla_simbolos.obtener_direccion(),
                     "valor": None,
+                    "retornar": True,
                     "estado": "declarado",
                     "estructura": None,
                     "contador_referencias": 0
@@ -1111,7 +1095,6 @@ class Parser:
         return params
     
     def llamada_funcion(self):
-        print("holaaaaa");
         nombre = self.match("IDENTIFICADOR")["token"]
         # CORREGIR: Incrementar contador de llamadas a función
         if hasattr(self.tabla_simbolos, 'buscar_funcion_extendida'):

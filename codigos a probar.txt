@@ -1,0 +1,150 @@
+//////////////////////////////////////////// este de aqui que es el primero es el que digo que se detiene en cuando detecta que la funcion hola() no esta
+
+entero a = 10;
+
+vacio b(){
+
+  entero c = 4;
+  imprimir(c);
+}
+
+imprimir(a);
+
+imprimir(hola());
+entero i = 3 + "hola";
+imprimir(i);
+
+/// Funciona segun lo esperado. ///
+
+
+////////////////////////////////////////////
+entero a(entero x, cadena b){
+    imprimir(x);
+    imprimir(b);
+    
+
+    retornar x;
+}
+
+entero c  =a("hola");
+
+imprimir(c);
+
+/// Funciona raro, al parecer itera segun el numero de parametros y por iteracion imprime todo.  ///
+
+///////////////////////////////////////
+
+entero a = 10;
+
+imprimir(a);
+vacio b(entero a){
+
+  entero c = 4;
+  imprimir(c);
+  imprimir(5);
+	
+
+}
+
+b(5);
+imprimir(a);
+
+/// Funciona segun lo esperado. ///
+
+//////////////////////////////////////
+
+entero a(){
+  imprimir(5);
+ 
+
+
+}
+
+/// Funciona segun lo esperado. ///
+
+////////////////////////////
+entero a(){
+  imprimir(5);
+
+}
+
+a();
+
+/// Funciona segun lo esperado. ///
+
+////////////////////////////////////////////////////////////
+
+imprimir(5+"hola");
+
+/// Funciona segun lo esperado. ///
+
+/////////////////////////////////////////////////////////////////
+
+entero a(){
+  imprimir(5);
+  return 4;
+}
+
+a();
+
+/// Deberia dar un error lexico por el return, aunque no se si es lexico, sintactico o semantico el error///
+
+
+////////////////////////////////////////////////////////////////
+
+vacio a(){
+  imprimir(5);
+  retornar 4;
+}
+
+a();
+
+/// Funciona segun lo esperado. ///
+
+entero a(){
+  imprimir(5);
+  retornar 4;
+}
+
+entero valor = a();
+
+/// Funciona segun lo esperado. ///
+
+///////////////////////////////////////////////////////////////
+entero func(entero a){
+    imprimir(a);
+    retornar 5+7;
+}
+
+imprimir(func(5));
+
+/// Funciona segun lo esperado. ///
+
+entero func(entero a){
+    imprimir(a);
+    retornar 5+7;
+}
+
+entero valor = func(5)
+
+/// Funciona segun lo esperado. ///
+
+/////////////////////////////////////////////////////////////
+entero func(entero a){
+   imprimir(a);
+   
+  retornar 6;
+
+
+}
+
+imprimir(func(3));
+
+/// Funciona segun lo esperado. ///
+
+////////////////////////////////////////////////////////////
+constante entero a = 6;
+a = 4;
+imprimir(a);
+
+/// No deberia poder cambia el valor de la constante, deberia dar error ///
