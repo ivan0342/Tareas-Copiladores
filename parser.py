@@ -2,6 +2,7 @@
 from tabla_simbolos import TablaSimbolos
 from verificaciones.clasificacion_errores import CategoriaError, ReporteErrores
 from verificaciones.verificadot_tipos import VerificadorTipos
+from verificaciones.validador_incializacion import ValidadorInicializacion
 class ParserError(Exception):
     pass
 
@@ -14,6 +15,7 @@ class Parser:
         self.ast = []  # árbol sintáctico abstracto
         self.reporte = reporte_errores
         self.verificador_tipos = VerificadorTipos(tabla_simbolos, reporte_errores)
+        self.validador_inicializacion = ValidadorInicializacion(tabla_simbolos, reporte_errores)
 
     def error(self, mensaje):
         tok = self.actual()
@@ -815,6 +817,9 @@ class Parser:
 
     # -------------------------------------------------------
 
+    def buscar_nodo(self, nodo):
+            pass
+        
     def _procesar_referencias_en_expresion(self, nodo):
         """Recorre una expresión e incrementa contadores de variables usadas - CORREGIDO"""
         if not isinstance(nodo, dict):
@@ -824,24 +829,46 @@ class Parser:
         print(f"DEBUG: Procesando nodo: {tipo_nodo}")
         print("nodo completo:  ", nodo)
 
+
+                
         if nodo.get("nodo") == "BIN_OP":
             lado_izq = nodo.get("izq")
             lado_izq = lado_izq.get("nodo")
             lado_der= nodo.get("der")
             lado_der= lado_der.get("nodo")
+            
+            if lado_izq == "VAR":
+                nombre = nodo.get("izq").get("id")
+                lado_izq = self.tabla_simbolos.buscar(nombre)
+                if not lado_izq:
+                    self.reporte.agregar_error(CategoriaError.DECLARACION, f"Variable '{nombre}' no declarada", self.actual()['linea'])
+                    return
+                lado_izq = lado_izq.get("tipo_dato")
+            if lado_der == "VAR":   
+                nombre = nodo.get("der").get("id")
+                lado_der = self.tabla_simbolos.buscar(nombre)
+                if not lado_der:
+                    self.reporte.agregar_error(CategoriaError.DECLARACION, f"Variable '{nombre}' no declarada", self.actual()['linea'])
+                    return
+                lado_der = lado_der.get("tipo_dato")
+
             self.verificador_tipos.verificar_compatibilidad(lado_izq, lado_der, nodo.get("op"), self.actual()['linea'])
 
           # Si es una variable, incrementar contador
         if tipo_nodo == "VAR":
             nombre = nodo.get("id")
             #en el caso de que la variable sea un parametro local, no se incrementa el contador
-            if self.tabla_simbolos.buscar(nombre) :
+            if self.tabla_simbolos.buscar(nombre):
                 posibleParametro = self.tabla_simbolos.buscar(nombre)
                 print("posible parametro: ", posibleParametro.get("categoria"))
                 if posibleParametro.get("categoria") == "parametro" and posibleParametro.get("estado") != "declarado":
                     print(f"DEBUG: La variable '{nombre}' es un parámetro local, no se incrementa el contador.")
                     pass# No incrementar contador para parámetros locales
-
+                
+                elif posibleParametro.get("valor") == None:
+                    self.validador_inicializacion.verificar_variable_no_inicializada(nombre, self.actual()['linea'])
+                    pass# No incrementar contador para parámetros no inicializados
+                    
             elif hasattr(self.tabla_simbolos, 'buscar_variable_extendida'):
                 variable = self.tabla_simbolos.buscar_variable_extendida(nombre)
                 if variable:

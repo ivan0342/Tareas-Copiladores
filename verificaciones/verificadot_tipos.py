@@ -18,7 +18,11 @@ class VerificadorTipos:
         # Evitar None
         if not tipo:
             return "DESCONOCIDO"
-
+        
+        if tipo == "VAR":
+            tabla_simbolos = self.tabla_simbolos
+            simbolo = tabla_simbolos.buscar(tipo)
+            
         # Ya viene normalizado
         if isinstance(tipo, str) and tipo.startswith("TIPO_"):
             return tipo
@@ -64,10 +68,13 @@ class VerificadorTipos:
         # Si es el nombre del token (MAS, IGUAL, AND...), mapearlo
         return self.op_token_a_simbolo.get(operacion, operacion)
 
+    
     def verificar_compatibilidad(self, tipo1, tipo2, operacion, linea):
         """Verifica si dos tipos son compatibles para una operación"""
         tipo1_norm = self.normalizar_tipo(tipo1)
         tipo2_norm = self.normalizar_tipo(tipo2)
+        
+        print("tipos:", tipo1_norm, tipo2_norm, "op:", operacion)
         op = self._normalizar_operacion(operacion)
 
         # Aritméticas
@@ -84,6 +91,7 @@ class VerificadorTipos:
             if tipo1_norm == tipo2_norm or (tipo1_norm in ['TIPO_ENTERO', 'TIPO_FLOTANTE'] and tipo2_norm in ['TIPO_ENTERO', 'TIPO_FLOTANTE']):
                 return True
             else:
+                print("holaaa")
                 self.reporte.agregar_error(CategoriaError.TIPO, f"Comparación '{op}' no válida entre {tipo1} y {tipo2}", linea)
                 print(f"🔥 DEBUG_TIPOS: Error de tipo en línea {linea}: comparación '{op}' entre {tipo1} y {tipo2} no es válida")
                 return False
