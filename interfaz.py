@@ -126,7 +126,7 @@ class Interfaz:
         frame_errore_semanticos = ttk.Frame(notebook)
         notebook.add(frame_errore_semanticos, text="🚨 Errores SEMANTICOS")
 
-        # Errores léxicos
+        # Errores semanticos
         frame_semanticos = ttk.LabelFrame(frame_errore_semanticos, text="Errores Semánticos")
         frame_semanticos.pack(fill="both", expand=True, padx=5, pady=5)
 
@@ -153,7 +153,7 @@ class Interfaz:
         scroll_salida = ttk.Scrollbar(frame_salida, command=area_salida.yview)
         area_salida.configure(yscrollcommand=scroll_salida.set)
         scroll_salida.pack(side="right", fill="y")
-        
+
 
 
         # Procesar salida del intérprete
@@ -168,21 +168,26 @@ class Interfaz:
                 else:
                     errores_reales.append(e)
 
-        
-        # Mostrar en pestaña de salida
-        if salida_interprete:
-            area_salida.insert(tk.END, "=== EJECUCIÓN EXITOSA ===\n\n")
-            for i, linea in enumerate(salida_interprete, 1):
-                area_salida.insert(tk.END, f"[{i}] {linea}\n")
-            area_salida.insert(tk.END, f"\n🎉 Programa ejecutado correctamente\n")
-            area_salida.insert(tk.END, f"📋 Total de líneas de salida: {len(salida_interprete)}")
+
+
+        if errores_semanticos:
+            area_salida.insert(tk.END, "=== EJECUCIÓN FALLIDA HAY ERRORES SEMANTICOS PRESENTES ===\n\n")
+
         else:
-            area_salida.insert(tk.END, "=== SIN SALIDA ===\n\n")
-            area_salida.insert(tk.END, "El programa no generó salida o no se ejecutó.\n\n")
-            if errores_reales:
-                area_salida.insert(tk.END, "Se encontraron errores durante el análisis:\n")
-                for error in errores_reales:
-                    area_salida.insert(tk.END, f"• {error}\n")
+            # Mostrar en pestaña de salida
+            if salida_interprete:
+                area_salida.insert(tk.END, "=== EJECUCIÓN EXITOSA ===\n\n")
+                for i, linea in enumerate(salida_interprete, 1):
+                    area_salida.insert(tk.END, f"[{i}] {linea}\n")
+                area_salida.insert(tk.END, f"\n🎉 Programa ejecutado correctamente\n")
+                area_salida.insert(tk.END, f"📋 Total de líneas de salida: {len(salida_interprete)}")
+            else:
+                area_salida.insert(tk.END, "=== SIN SALIDA ===\n\n")
+                area_salida.insert(tk.END, "El programa no generó salida o no se ejecutó.\n\n")
+                if errores_reales:
+                    area_salida.insert(tk.END, "Se encontraron errores durante el análisis:\n")
+                    for error in errores_reales:
+                        area_salida.insert(tk.END, f"• {error}\n")
 
         area_salida.config(state="disabled")
 

@@ -85,10 +85,10 @@ class VisualizadorOptimizacion:
         texto_metricas.config(state="disabled")
 
     def _calcular_metricas_completas(self):
-        """Calcula métricas completas de la optimización"""
+        """Calcula métricas completas de la optimización """
         metricas = "=== 📊 MÉTRICAS DE OPTIMIZACIÓN COMPLETA ===\n\n"
 
-        # Métricas por nivel
+        # Métricas por nivel - USAR VALORES ACTUALES
         for nivel in ['local', 'bucles', 'global']:
             if nivel in self.optimizador.metricas:
                 m = self.optimizador.metricas[nivel]
@@ -97,9 +97,11 @@ class VisualizadorOptimizacion:
                 metricas += f"   • Tiempo de ejecución: {m['tiempo']:.4f}s\n"
                 metricas += f"   • Reducción de código: {m['reduccion_codigo']} líneas\n\n"
 
-        # Métricas de scopes
+        # Métricas de scopes - USAR DATOS REALES
         scopes_antes = len(self.optimizador.scopes_antes)
         scopes_despues = len(self.optimizador.scopes_despues)
+
+        # Calcular variables reales desde los scopes
         vars_antes = sum(len(vars) for vars in self.optimizador.scopes_antes.values())
         vars_despues = sum(len(vars) for vars in self.optimizador.scopes_despues.values())
 
@@ -110,16 +112,22 @@ class VisualizadorOptimizacion:
         metricas += f"Variables después: {vars_despues}\n"
         metricas += f"Reducción de variables: {vars_antes - vars_despues}\n\n"
 
-        # Eficiencia
+        # Eficiencia - CALCULAR CON DATOS REALES
         total_optimizaciones = sum(m['aplicadas'] for m in self.optimizador.metricas.values())
         total_tiempo = sum(m['tiempo'] for m in self.optimizador.metricas.values())
-        total_reduccion = sum(m['reduccion_codigo'] for m in self.optimizador.metricas.values())
+
+        # 🔥 CALCULAR REDUCCIÓN TOTAL REAL desde los scopes
+        total_reduccion = vars_antes - vars_despues
 
         metricas += "=== ⚡ EFICIENCIA GENERAL ===\n"
         metricas += f"Total optimizaciones: {total_optimizaciones}\n"
         metricas += f"Tiempo total: {total_tiempo:.4f}s\n"
         metricas += f"Reducción total: {total_reduccion} líneas\n"
-        metricas += f"Optimizaciones/segundo: {total_optimizaciones / max(total_tiempo, 0.001):.2f}\n"
+
+        if total_tiempo > 0:
+            metricas += f"Optimizaciones/segundo: {total_optimizaciones / total_tiempo:.2f}\n"
+        else:
+            metricas += "Optimizaciones/segundo: ∞ (tiempo muy pequeño)\n"
 
         return metricas
 

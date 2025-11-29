@@ -130,6 +130,71 @@ mientras (i < 5) {
     // Posible reducción de fuerza
     entero j = i * 2;
     i = i + 1;
-};
+}
 
 imprimir("Resultado: " + z);
+
+// Caso 13
+
+// Código de prueba con optimizaciones
+
+entero x = 10;
+
+// Debería optimizarse a y = x
+entero y = x * 1;
+
+//Debería optimizarse a z = y
+entero z = 0 + y;
+
+entero i = 0;
+entero c =0;
+mientras (i < 5) {
+    // Posible reducción de fuerza
+    entero j = i * 2;
+    i = i + 1;
+   c=c+1;
+   imprimir(c);
+}
+
+imprimir("Resultado: " + z);
+
+// Caso 14
+
+entero x = 10;
+entero i = 0;
+mientras (i < 5) {
+    // ← Oportunidad detectada
+    entero j = i * 2;
+    // ← Variable muerta (si no se usa)
+    entero temp = x + i;
+    // ← Incremento simple detectado
+    i = i + 1;
+}
+
+// Caso 15
+
+entero a = 5;
+entero b = 10;
+entero i = 0;
+
+mientras (i < 3) {
+    // ← Variable muerta
+    entero no_usado1 = a * b;
+    // ← Variable muerta
+    entero no_usado2 = i * i;
+    // ← Única variable usada
+    entero resultado = i + 1;
+    imprimir(resultado);
+    i = i + 1;
+}
+
+// Caso 16
+
+entero i = 0;
+mientras (i < 10) {
+    // ← Solo esto, sin variables muertas
+    imprimir(i);
+    // ← Incremento simple detectado
+    i = i + 1;
+}
+// No hay multiplicaciones ×2 ni variables muertas
